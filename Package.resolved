@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "NonEmpty",
+        "repositoryURL": "https://github.com/pointfreeco/swift-nonempty.git",
+        "state": {
+          "branch": null,
+          "revision": "9ef8c4aea57b8da7fedd5303d29470ea2a00c08d",
+          "version": "0.2.2"
+        }
+      }
+    ]
+  },
+  "version": 1
+}
