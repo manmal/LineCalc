@@ -117,8 +117,8 @@ public extension Calc.Line {
 
 public extension Calc.Group {
 
-    init(id: ID = .default(), _ items: [Calc.Item], outcome: Calc.GroupOutcome) {
-        self.init(id: id, items: items, outcome: outcome)
+    init(id: ID = .default(), outcome: Calc.GroupOutcome, @Calc.GroupBuilder items: () -> [Calc.Item]) {
+        self.init(id: id, items: items(), outcome: outcome)
     }
 }
 
