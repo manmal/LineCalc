@@ -4,16 +4,21 @@ import XCTest
 final class LineCalcTests: XCTestCase {
 
     func testGroupSum() {
-        let calc = DoubleCalc(
-            group: DoubleCalc.Group(outcome: .sum()) {
+        let calc = Calc<Double>(
+            group: Group(outcome: .sum()) {
                 (3, "three")
                 (5, "five")
                 (7, "seven")
-                DoubleCalc.Group(outcome: .product()) {}
-                DoubleCalc.Item.sum(from: .line("three"), to: .line("five"), id: .init("sumShouldBeEight"))
-                DoubleCalc.Item.sum(from: .line("five"), to: .line("five"), id: .init("sumShouldBeFive"))
-                DoubleCalc.Item.sum(from: .line("three"), to: .line("seven"), id: .init("sumShouldBeFifteenA"))
-                DoubleCalc.Item.sum(from: .line("seven"), to: .line("three"), id: .init("sumShouldBeFifteenB"))
+                GroupSum {
+                    2
+                    2
+                    2
+                    2
+                }
+                Sum(fromLine: "three", toLine: "five",  id: .init("sumShouldBeEight"))
+                Sum(fromLine: "five",  toLine: "five",  id: .init("sumShouldBeFive"))
+                Sum(fromLine: "three", toLine: "seven", id: .init("sumShouldBeFifteenA"))
+                Sum(fromLine: "seven", toLine: "three", id: .init("sumShouldBeFifteenB"))
             }
         )
         let result = DoubleCalc.Runner.run(calc).groupResult
@@ -22,7 +27,7 @@ final class LineCalcTests: XCTestCase {
         XCTAssertEqual(result.value(atLine: "sumShouldBeFive"), 5)
         XCTAssertEqual(result.value(atLine: "sumShouldBeFifteenA"), 15)
         XCTAssertEqual(result.value(atLine: "sumShouldBeFifteenB"), 15)
-        XCTAssertEqual(sum, 58)
+        XCTAssertEqual(sum, 66)
     }
 
     static var allTests = [

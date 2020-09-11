@@ -13,13 +13,7 @@ public extension Calc {
 
         public static func runIteration(calc: Calc, result: CalcResult?) -> CalcResult {
             let base = result ?? CalcResult(skeletonWithCalc:calc)
-            return CalcResult(
-                groupResult: .init(
-                    group: calc.group,
-                    outcomeResult: calcLineResult(base.groupResult.outcomeResult, calcResult: base),
-                    itemResults: base.groupResult.itemResults.map { calcItemResult($0, calcResult: base) }
-                )
-            )
+            return CalcResult(groupResult: calcGroupResult(base.groupResult, calcResult: base))
         }
 
         public static func calcItemResult(_ itemResult: ItemResult, calcResult: CalcResult) -> ItemResult {
@@ -27,14 +21,16 @@ public extension Calc {
             case let .line(lineResult):
                 return .line(calcLineResult(lineResult, calcResult: calcResult))
             case let .group(groupResult):
-                return .group(
-                    .init(
-                        group: groupResult.group,
-                        outcomeResult: calcLineResult(groupResult.outcomeResult, calcResult: calcResult),
-                        itemResults: groupResult.itemResults.map { calcItemResult($0, calcResult: calcResult) }
-                    )
-                )
+                return .group(calcGroupResult(groupResult, calcResult: calcResult))
             }
+        }
+
+        public static func calcGroupResult(_ groupResult: GroupResult, calcResult: CalcResult) -> GroupResult {
+            GroupResult(
+                group: groupResult.group,
+                outcomeResult: calcLineResult(groupResult.outcomeResult, calcResult: calcResult),
+                itemResults: groupResult.itemResults.map { calcItemResult($0, calcResult: calcResult) }
+            )
         }
 
         public static func calcLineResult(_ lineResult: LineResult, calcResult: CalcResult) -> LineResult {
@@ -48,7 +44,7 @@ public extension Calc {
             )
         }
 
-        public static func calcValueResult(_ valueResult: ValueResult, line: Line, calcResult: CalcResult) -> ValueResult {
+        public static func calcValueResult(_ valueResult: ValueResult, line: Line<T>, calcResult: CalcResult) -> ValueResult {
             switch valueResult {
             case .calculated, .pending, .error(.errorInRef):
                 switch line.value {
@@ -56,16 +52,16 @@ public extension Calc {
                     return .immutable(plainValue)
                 case let .reference(id):
                     guard
-                        let lineResult = calcResult.groupResult.lineResultsInRange(range: .all).first(where: { _ in true })
+                        let lineResult = calcResult.groupResult.firstLineResultInRange(range: .all)
                     else {
                         return .error(.referenceNotFound(line: line.id, missingRef: id))
                     }
                     return lineResult.valueResult
                 case let .binaryOp(op):
-                    guard let a = calcResult.groupResult.lineResultsInRange(range: .single(op.a)).first(where: { _ in true }) else {
+                    guard let a = calcResult.groupResult.firstLineResultInRange(range: .single(op.a)) else {
                         return .error(.referenceNotFound(line: line.id, missingRef: op.a))
                     }
-                    guard let b = calcResult.groupResult.lineResultsInRange(range: .single(op.b)).first(where: { _ in true }) else {
+                    guard let b = calcResult.groupResult.firstLineResultInRange(range: .single(op.b)) else {
                         return .error(.referenceNotFound(line: line.id, missingRef: op.b))
                     }
                     guard let aValue = a.valueResult.value, let bValue = b.valueResult.value else {
@@ -73,24 +69,26 @@ public extension Calc {
                     }
                     return .calculated(op.op(aValue, bValue))
                 case let .rangeOp(rangeOp):
-                        switch rangeOp.scope {
-                        case let .fromTo(from, to):
-                            return reduceLineRange(
-                                fromRef: from,
-                                toRef: to,
-                                reduce: rangeOp.reduce,
-                                forLine: line,
-                                calcResult: calcResult
-                            )
-                        case let .group(groupId):
-                            return reduceLineRange(
-                                fromRef: .outcomeOfGroup(groupId),
-                                toRef: .outcomeOfGroup(groupId),
-                                reduce: rangeOp.reduce,
-                                forLine: line,
-                                calcResult: calcResult
-                            )
-                        }
+                    switch rangeOp.scope {
+                    case let .fromTo(from, to):
+                        return reduceLineRange(
+                            fromRef: from,
+                            toRef: to,
+                            reduce: rangeOp.reduce,
+                            recursive: rangeOp.recursive,
+                            forLine: line,
+                            calcResult: calcResult
+                        )
+                    case let .group(groupId):
+                        return reduceLineRange(
+                            fromRef: .outcomeOfGroup(groupId),
+                            toRef: .outcomeOfGroup(groupId),
+                            reduce: rangeOp.reduce,
+                            recursive: rangeOp.recursive,
+                            forLine: line,
+                            calcResult: calcResult
+                        )
+                    }
                 }
             case .immutable, .error:
                 return valueResult
@@ -101,13 +99,15 @@ public extension Calc {
             fromRef: Ref,
             toRef: Ref,
             reduce: ([T]) -> T,
-            forLine line: Line,
+            recursive: Bool,
+            forLine line: Line<T>,
             calcResult: CalcResult
         ) -> ValueResult {
             let searchState = Calc.RangeSearchState()
             let lineResults = Array(
-                calcResult.groupResult
-                .lineResultsInRange(range: .bounded(boundA: fromRef, boundB: toRef, state: searchState))
+                calcResult.groupResult.lineResultsInRange(
+                    range: .bounded(boundA: fromRef, boundB: toRef, recursive: recursive, state: searchState)
+                )
             )
 
             switch searchState.innerState {

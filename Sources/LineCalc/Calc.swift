@@ -1,7 +1,7 @@
 import Foundation
 
 public struct Calc<T: CalcValue> {
-    let group: Group
+    let group: Group<T>
 
     /// Max number of iterations _after_ the first run
     let maxIterations: Int = 10
