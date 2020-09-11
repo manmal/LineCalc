@@ -16,6 +16,7 @@ public extension Calc {
             return CalcResult(
                 groupResult: .init(
                     group: calc.group,
+                    outcomeResult: calcLineResult(base.groupResult.outcomeResult, calcResult: base),
                     itemResults: base.groupResult.itemResults.map { calcItemResult($0, calcResult: base) }
                 )
             )
@@ -24,24 +25,27 @@ public extension Calc {
         public static func calcItemResult(_ itemResult: ItemResult, calcResult: CalcResult) -> ItemResult {
             switch itemResult {
             case let .line(lineResult):
-                return .line(
-                    .init(
-                        line: lineResult.line,
-                        valueResult: calcValueResult(
-                            lineResult.valueResult,
-                            line: lineResult.line,
-                            calcResult: calcResult
-                        )
-                    )
-                )
+                return .line(calcLineResult(lineResult, calcResult: calcResult))
             case let .group(groupResult):
                 return .group(
                     .init(
                         group: groupResult.group,
+                        outcomeResult: calcLineResult(groupResult.outcomeResult, calcResult: calcResult),
                         itemResults: groupResult.itemResults.map { calcItemResult($0, calcResult: calcResult) }
                     )
                 )
             }
+        }
+
+        public static func calcLineResult(_ lineResult: LineResult, calcResult: CalcResult) -> LineResult {
+            LineResult(
+                line: lineResult.line,
+                valueResult: calcValueResult(
+                    lineResult.valueResult,
+                    line: lineResult.line,
+                    calcResult: calcResult
+                )
+            )
         }
 
         public static func calcValueResult(_ valueResult: ValueResult, line: Line, calcResult: CalcResult) -> ValueResult {
@@ -51,15 +55,17 @@ public extension Calc {
                 case let .plain(plainValue):
                     return .immutable(plainValue)
                 case let .reference(id):
-                    guard let lineResult = calcResult.groupResult.itemResults.firstLineResult(id) else {
+                    guard
+                        let lineResult = calcResult.groupResult.lineResultsInRange(range: .all).first(where: { _ in true })
+                    else {
                         return .error(.referenceNotFound(line: line.id, missingRef: id))
                     }
                     return lineResult.valueResult
                 case let .binaryOp(op):
-                    guard let a = calcResult.groupResult.itemResults.firstLineResult(op.a) else {
+                    guard let a = calcResult.groupResult.lineResultsInRange(range: .single(op.a)).first(where: { _ in true }) else {
                         return .error(.referenceNotFound(line: line.id, missingRef: op.a))
                     }
-                    guard let b = calcResult.groupResult.itemResults.firstLineResult(op.b) else {
+                    guard let b = calcResult.groupResult.lineResultsInRange(range: .single(op.b)).first(where: { _ in true }) else {
                         return .error(.referenceNotFound(line: line.id, missingRef: op.b))
                     }
                     guard let aValue = a.valueResult.value, let bValue = b.valueResult.value else {
@@ -69,21 +75,18 @@ public extension Calc {
                 case let .rangeOp(rangeOp):
                         switch rangeOp.scope {
                         case let .fromTo(from, to):
-                            return calcLineRangeOp(
-                                fromLineResult: from,
-                                toLineResult: to,
-                                op: rangeOp.op,
+                            return reduceLineRange(
+                                fromRef: from,
+                                toRef: to,
+                                reduce: rangeOp.reduce,
                                 forLine: line,
                                 calcResult: calcResult
                             )
                         case let .group(groupId):
-                            guard let groupResult = calcResult.groupResult.itemResults.firstGroupResult(groupId) else {
-                                return .error(.rangeGroupNotFound(line: line.id, rangeGroupRef: groupId))
-                            }
-                            return calcLineRangeOp(
-                                fromLineResult: groupResult.firstLineResult.line.id,
-                                toLineResult: groupResult.lastLineResult.line.id,
-                                op: rangeOp.op,
+                            return reduceLineRange(
+                                fromRef: .outcomeOfGroup(groupId),
+                                toRef: .outcomeOfGroup(groupId),
+                                reduce: rangeOp.reduce,
                                 forLine: line,
                                 calcResult: calcResult
                             )
@@ -94,40 +97,40 @@ public extension Calc {
             }
         }
 
-        static func calcLineRangeOp(
-            fromLineResult: ID,
-            toLineResult: ID,
-            op: ([T]) -> T,
+        static func reduceLineRange(
+            fromRef: Ref,
+            toRef: Ref,
+            reduce: ([T]) -> T,
             forLine line: Line,
             calcResult: CalcResult
         ) -> ValueResult {
-            var started = false
-            var ended = false
-            let lineResults = calcResult.groupResult.itemResults.lineResultsInRange(
-                from: fromLineResult,
-                to: toLineResult,
-                started: &started,
-                ended: &ended
+            let searchState = Calc.RangeSearchState()
+            let lineResults = Array(
+                calcResult.groupResult
+                .lineResultsInRange(range: .bounded(boundA: fromRef, boundB: toRef, state: searchState))
             )
-            guard started else {
-                return .error(.rangeFromNotFound(line: line.id, rangeFromRef: fromLineResult))
-            }
-            guard ended else {
-                return .error(.rangeToNotFound(line: line.id, rangeToRef: toLineResult))
+
+            switch searchState.innerState {
+            case .initial:
+                return .error(.rangeFromNotFound(line: line.id, rangeFromRef: fromRef))
+            case let .oneBoundFound(foundBound):
+                let unfoundBound = foundBound == fromRef ? toRef : fromRef
+                return .error(.rangeToNotFound(line: line.id, rangeToRef: unfoundBound))
+            case .finished:
+                var resolvedValues = [T]()
+                for lineResult in lineResults {
+                    switch lineResult.valueResult {
+                    case let .immutable(value), let .calculated(value):
+                        resolvedValues.append(value)
+                    case .pending:
+                        return .pending
+                    case let .error(error):
+                        return .error(.errorInRef(ref: .line(lineResult.line.id), error))
+                    }
+                }
+                return .calculated(reduce(resolvedValues))
             }
 
-            var resolvedValues = [T]()
-            for lineResult in lineResults {
-                switch lineResult.valueResult {
-                case let .immutable(value), let .calculated(value):
-                    resolvedValues.append(value)
-                case .pending:
-                    return .pending
-                case let .error(error):
-                    return .error(.errorInRef(ref: lineResult.line.id, error))
-                }
-            }
-            return .calculated(op(resolvedValues))
         }
     }
 

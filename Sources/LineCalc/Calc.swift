@@ -1,5 +1,4 @@
 import Foundation
-import NonEmpty
 
 public struct Calc<T: CalcValue> {
     let group: Group

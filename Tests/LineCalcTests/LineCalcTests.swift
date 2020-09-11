@@ -3,32 +3,36 @@ import XCTest
 
 final class LineCalcTests: XCTestCase {
 
-    func testGroupSum() throws {
-        let calc = try DoubleCalc(
-            group: .init(id: .default(), items: [
-                .group(
-                    .init(
-                        id: .string("group1"),
-                        items: [
-                            .line(3),
-                            .line(5),
-                            .line(7)
-                        ]
-                    )
-                ),
-                .line(
-                    .init(
-                        id: .string("sum"),
-                        .rangeOp(
-                            .init(groupResultId: .string("group1")) { $0.reduce(0, +) }
+    func testGroupSum() {
+        let calc = DoubleCalc(
+            group: .init(
+                [
+                    .value(3, id: "three"),
+                    .value(5, id: "five"),
+                    .value(7, id: "seven"),
+                    .group(
+                        DoubleCalc.Group(
+                            [
+
+                            ],
+                            outcome: .product()
                         )
-                    )
-                )
-            ])
+                    ),
+                    .sum(from: .line("three"), to: .line("five"), id: .init("sumShouldBeEight")),
+                    .sum(from: .line("five"), to: .line("five"), id: .init("sumShouldBeFive")),
+                    .sum(from: .line("three"), to: .line("seven"), id: .init("sumShouldBeFifteenA")),
+                    .sum(from: .line("seven"), to: .line("three"), id: .init("sumShouldBeFifteenB")),
+                ],
+                outcome: .sum()
+            )
         )
         let result = DoubleCalc.Runner.run(calc)
-        let sum = result.groupResult.itemResults.firstLineResult(.string("sum"))?.valueResult.value
-        XCTAssertEqual(sum, 15)
+        let sum = result.groupResult.outcomeResult.valueResult.value
+        XCTAssertEqual(result.groupResult.value(atLine: "sumShouldBeEight"), 8)
+        XCTAssertEqual(result.groupResult.value(atLine: "sumShouldBeFive"), 5)
+        XCTAssertEqual(result.groupResult.value(atLine: "sumShouldBeFifteenA"), 15)
+        XCTAssertEqual(result.groupResult.value(atLine: "sumShouldBeFifteenB"), 15)
+        XCTAssertEqual(sum, 58)
     }
 
     static var allTests = [

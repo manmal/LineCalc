@@ -1,5 +1,4 @@
 import Foundation
-import NonEmpty
 
 public extension Calc {
 
@@ -16,10 +15,6 @@ public extension Calc {
                 return line.id
             }
         }
-
-        static func line(_ value: T) -> Item {
-            return .line(.init(value))
-        }
     }
 
     enum ID: Hashable {
@@ -30,6 +25,19 @@ public extension Calc {
         public struct OpaqueID: Hashable {
             private let uuid = UUID()
             public init() {}
+        }
+
+        public init(_ string: String) {
+            self = .string(string)
+        }
+    }
+
+    enum Ref: Hashable {
+        case line(ID)
+        case outcomeOfGroup(ID)
+
+        public static func line(_ lineIdString: String) -> Ref {
+            line(.string(lineIdString))
         }
     }
 
@@ -42,19 +50,27 @@ public extension Calc {
     struct Group: Equatable {
         public typealias ID = Item.ID
         let id: Group.ID
-        let items: NonEmpty<[Item]>
+        let items: [Item]
+        let outcome: GroupOutcome
+    }
+
+    enum GroupOutcome: Equatable {
+        public typealias ID = Item.ID
+        case sum(ID = .default())
+        case product(ID = .default())
+        case line(Line)
     }
 
     indirect enum Value: Equatable {
         case plain(T)
-        case reference(ID)
+        case reference(Ref)
         case binaryOp(BinaryOp)
         case rangeOp(RangeOp)
     }
 
     struct BinaryOp: Equatable {
-        let a: ID
-        let b: ID
+        let a: Ref
+        let b: Ref
         let op: (T, T) -> T
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -64,14 +80,14 @@ public extension Calc {
 
     struct RangeOp: Equatable {
         let scope: Scope
-        let op: ([T]) -> T
+        let reduce: ([T]) -> T
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.scope == rhs.scope
         }
 
         public enum Scope: Equatable {
-            case fromTo(from: ID, to: ID)
+            case fromTo(from: Ref, to: Ref)
             case group(ID)
         }
     }
@@ -83,19 +99,15 @@ public extension Calc {
 
 public extension Calc.RangeOp {
 
-    init(from: Calc.ID, to: Calc.ID, op: @escaping ([T]) -> T) {
-        self.init(scope: .fromTo(from: from, to: to), op: op)
-    }
-
-    init(groupResultId: Calc.ID, op: @escaping ([T]) -> T) {
-        self.init(scope: .group(groupResultId), op: op)
+    init(from: Calc.Ref, to: Calc.Ref, reduce: @escaping ([T]) -> T) {
+        self.init(scope: .fromTo(from: from, to: to), reduce: reduce)
     }
 }
 
 public extension Calc.Line {
 
     init(id: ID = .default(), _ immutableValue: T) {
-        self.init(id: id, value: .plain(immutableValue))
+        self.init(id: id, .plain(immutableValue))
     }
 
     init(id: ID = .default(), _ value: Calc.Value) {
@@ -105,11 +117,35 @@ public extension Calc.Line {
 
 public extension Calc.Group {
 
-    init(id: ID, items: [Calc.Item]) throws {
-        guard let first = items.first else {
-            throw Calc.CalcError.emptyGroup(id)
-        }
-        self.id = id
-        self.items = .init(first, Array(items.dropFirst()))
+    init(id: ID = .default(), _ items: [Calc.Item], outcome: Calc.GroupOutcome) {
+        self.init(id: id, items: items, outcome: outcome)
+    }
+}
+
+public extension Calc.Item {
+
+    static func value(_ value: T, id: ID = .default()) -> Calc.Item {
+        .line(.init(id: id, value))
+    }
+
+    static func value(_ value: T, id idString: String) -> Calc.Item {
+        self.value(value, id: .string(idString))
+    }
+
+    static func rangeOp(from: Calc.Ref, to: Calc.Ref, id: ID = .default(), reduce: @escaping ([T]) -> T) -> Calc.Item {
+        .line(
+            .init(
+                id: id,
+                Calc.Value.rangeOp(Calc.RangeOp.init(from: from, to: to, reduce: reduce))
+            )
+        )
+    }
+
+    static func sum(from: Calc.Ref, to: Calc.Ref, id: ID = .default()) -> Calc.Item {
+        rangeOp(from: from, to: to, id: id, reduce: { $0.reduce(0, +) })
+    }
+
+    static func product(id: ID = .default(), from: Calc.Ref, to: Calc.Ref) -> Calc.Item {
+        rangeOp(from: from, to: to, reduce: { $0.reduce(0, *) })
     }
 }

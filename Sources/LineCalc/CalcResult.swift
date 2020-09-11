@@ -1,5 +1,4 @@
 import Foundation
-import NonEmpty
 
 public extension Calc {
 
@@ -19,7 +18,8 @@ public extension Calc {
 
     struct GroupResult {
         let group: Group
-        let itemResults: NonEmpty<[ItemResult]>
+        let outcomeResult: LineResult
+        let itemResults: [ItemResult]
     }
 
     enum ValueResult {
@@ -41,11 +41,11 @@ public extension Calc {
     }
 
     indirect enum ValueError: Error {
-        case referenceNotFound(line: ID, missingRef: ID)
-        case rangeFromNotFound(line: ID, rangeFromRef: ID)
-        case rangeToNotFound(line: ID, rangeToRef: ID)
-        case rangeGroupNotFound(line: ID, rangeGroupRef: ID)
-        case errorInRef(ref: ID, ValueError)
+        case referenceNotFound(line: ID, missingRef: Ref)
+        case rangeFromNotFound(line: ID, rangeFromRef: Ref)
+        case rangeToNotFound(line: ID, rangeToRef: Ref)
+        case rangeGroupNotFound(line: ID, rangeGroupRef: Ref)
+        case errorInRef(ref: Ref, ValueError)
     }
 }
 
@@ -54,125 +54,297 @@ extension Calc.ItemResult {
     init(skeletonWithItem item: Calc.Item) {
         switch item {
         case let .group(group):
-            self = .group(
-                .init(
-                    group: group,
-                    itemResults: group.items.map(Self.init(skeletonWithItem:))
+            self = .group(Calc.GroupResult(skeletonWithGroup: group))
+        case let .line(line):
+            self = .line(Calc.LineResult(skeletonWithLine: line))
+        }
+    }
+}
+
+extension Calc.GroupResult {
+
+    init(skeletonWithGroup group: Calc.Group) {
+        let itemResults = group.items.map(Calc.ItemResult.init(skeletonWithItem:))
+        self = .init(
+            group: group,
+            outcomeResult: Calc.LineResult(skeletonWithGroupOutcome: group.outcome, groupItemResults: itemResults),
+            itemResults: itemResults
+        )
+    }
+}
+
+extension Calc.LineResult {
+
+    init(skeletonWithLine line: Calc.Line) {
+        let valueResult: Calc.ValueResult = {
+            switch line.value {
+            case let .plain(value):
+                return .immutable(value)
+            case .reference, .binaryOp, .rangeOp:
+                return .pending
+            }
+        }()
+        self = Calc.LineResult(line: line, valueResult: valueResult)
+    }
+
+    init(skeletonWithGroupOutcome outcome: Calc.GroupOutcome, groupItemResults: [Calc.ItemResult]) {
+        switch outcome {
+        case let .line(line):
+            self.init(skeletonWithLine: line)
+        case let .sum(id):
+            guard let first = groupItemResults.first, let last = groupItemResults.last else {
+                self.init(skeletonWithLine: .init(id: id, value: .plain(0)))
+                return
+            }
+
+            self.init(
+                skeletonWithLine: Calc.Line(
+                    id: id,
+                    value: .rangeOp(Calc.RangeOp(from: first.ref, to: last.ref, reduce: { $0.reduce(0, +) }))
                 )
             )
-        case let .line(line):
-            let valueResult: Calc.ValueResult = {
-                switch line.value {
-                case let .plain(value):
-                    return .immutable(value)
-                case .reference, .binaryOp, .rangeOp:
-                    return .pending
-                }
-            }()
-            self = .line(.init(line: line, valueResult: valueResult))
+        case let .product(id):
+            guard let first = groupItemResults.first, let last = groupItemResults.last else {
+                self.init(skeletonWithLine: .init(id: id, value: .plain(0)))
+                return
+            }
+
+            self.init(
+                skeletonWithLine: Calc.Line(
+                    id: id,
+                    value: .rangeOp(Calc.RangeOp(from: first.ref, to: last.ref, reduce: { $0.reduce(0, *) }))
+                )
+            )
         }
+        let valueResult: Calc.ValueResult = {
+            switch line.value {
+            case let .plain(value):
+                return .immutable(value)
+            case .reference, .binaryOp, .rangeOp:
+                return .pending
+            }
+        }()
+        self = Calc.LineResult(line: line, valueResult: valueResult)
     }
 }
 
 extension Calc.CalcResult {
 
     init(skeletonWithCalc calc: Calc) {
-        let itemResults = calc.group.items.map(Calc.ItemResult.init(skeletonWithItem:))
-        groupResult = .init(group: calc.group, itemResults: itemResults)
+        groupResult = Calc.GroupResult(skeletonWithGroup: calc.group)
     }
 }
 
-extension Calc.GroupResult {
+public extension Calc.ItemResult {
 
-    var firstLineResult: Calc.LineResult {
-        switch itemResults.first {
+    var ref: Calc.Ref {
+        switch self {
         case let .group(groupResult):
-            return groupResult.firstLineResult
+            return .outcomeOfGroup(groupResult.group.id)
         case let .line(lineResult):
-            return lineResult
+            return .line(lineResult.line.id)
         }
     }
 
-    var lastLineResult: Calc.LineResult {
-        switch itemResults.last {
-        case let .group(groupResult):
-            return groupResult.lastLineResult
+    var allLineResults: AnySequence<Calc.LineResult> {
+
+        switch self {
         case let .line(lineResult):
-            return lineResult
+            return .init([lineResult])
+        case let .group(groupResult):
+            return AnySequence(groupResult.allLineResults.lazy)
         }
+    }
+
+    func lineResultsInRange(
+        range: Calc.ResultRange,
+        parentGroupResult: Calc.GroupResult
+    ) -> AnySequence<Calc.LineResult> {
+
+        switch self {
+        case let .line(lineResult):
+            if let lineResult = lineResult.lineResultIfInRange(range: range, parentGroupResult: parentGroupResult) {
+                    return .init([lineResult])
+                } else {
+                    return .init([])
+                }
+        case let .group(groupResult):
+            return groupResult.lineResultsInRange(range: range)
+        }
+    }
+}
+
+/// Lazy collection
+public extension Calc.GroupResult {
+
+    var allLineResults: AnySequence<Calc.LineResult> {
+        AnySequence<Calc.LineResult>(
+            (itemResults + [Calc.ItemResult.line(outcomeResult)])
+            .lazy
+            .flatMap { itemResult -> AnySequence<Calc.LineResult> in
+                switch itemResult {
+                case let .group(groupResult):
+                    return groupResult.allLineResults
+                case let .line(lineResult):
+                    return .init([lineResult])
+                }
+            }
+        )
+    }
+
+    func lineResultsInRange(
+        range: Calc.ResultRange
+    ) -> AnySequence<Calc.LineResult> {
+
+        AnySequence<Calc.LineResult>(
+            (itemResults + [Calc.ItemResult.line(outcomeResult)])
+            .lazy
+            .flatMap { itemResult -> AnySequence<Calc.LineResult> in
+                switch range {
+                case let .bounded(_, _, state) where state.finished:
+                    return .init([])
+                case .all, .bounded:
+                    break
+                }
+
+                switch itemResult {
+                case let .group(groupResult):
+                    return groupResult.lineResultsInRange(range: range)
+                case let .line(lineResult):
+                    if let lineResult = lineResult.lineResultIfInRange(range: range, parentGroupResult: self) {
+                        return .init([lineResult])
+                    } else {
+                        return .init([])
+                    }
+                }
+            }
+        )
+    }
+
+    func firstLineResultInRange(range: Calc.ResultRange) -> Calc.LineResult? {
+        lineResultsInRange(range: range).first(where: { _ in true })
+    }
+
+    func lineResult(at ref: Calc.Ref) -> Calc.LineResult? {
+        firstLineResultInRange(range: .single(ref))
+    }
+
+    func value(at ref: Calc.Ref) -> T? {
+        lineResult(at: ref)?.valueResult.value
+    }
+
+    func value(atLine lineId: Calc.ID) -> T? {
+        value(at: .line(lineId))
+    }
+
+    func value(atLine lineIdString: String) -> T? {
+        value(at: .line(.string(lineIdString)))
     }
 
 }
 
-public extension NonEmptyArray {
-    func lineResultsInRange<Value: CalcValue>(
-        from rangeFrom: Calc<Value>.ID,
-        to rangeTo: Calc<Value>.ID,
-        started: inout Bool,
-        ended: inout Bool
-    ) -> [Calc<Value>.LineResult] where Element == Calc<Value>.ItemResult {
-        var lineResults = [Calc<Value>.LineResult]()
-        for itemResult in self {
-            guard !ended else { return lineResults }
-            switch itemResult {
-            case let .group(groupResult):
-                lineResults.append(
-                    contentsOf: groupResult.itemResults.lineResultsInRange(
-                        from: rangeFrom,
-                        to: rangeTo,
-                        started: &started,
-                        ended: &ended
-                    )
-                )
-            case let .line(lineResult):
-                if started, !ended {
-                    lineResults.append(lineResult)
-                    if lineResult.line.id == rangeTo {
-                        ended = true
-                    }
-                } else if !started, lineResult.line.id == rangeFrom {
-                    started = true
-                    lineResults.append(lineResult)
-                    if lineResult.line.id == rangeTo {
-                        ended = true
-                    }
-                }
+public extension Calc {
+    enum ResultRange {
+        case all
+        case bounded(boundA: Ref, boundB: Ref, state: Calc.RangeSearchState = .init())
+
+        public var isSingle: Bool {
+            switch self {
+            case .all:
+                return false
+            case let .bounded(boundA, boundB, _):
+                return boundA == boundB
             }
         }
-        return lineResults
+
+        public static func single(_ ref: Ref) -> ResultRange {
+            bounded(boundA: ref, boundB: ref)
+        }
     }
 
-    func firstLineResult<Value: CalcValue>(_ id: Calc<Value>.ID) -> Calc<Value>.LineResult?
-    where Element == Calc<Value>.ItemResult {
-        for itemResult in self {
-            switch itemResult {
-            case let .line(lineResult):
-                if lineResult.line.id == id {
-                    return lineResult
-                }
-            case let .group(groupResult):
-                if let lineResult = groupResult.itemResults.firstLineResult(id) {
-                    return lineResult
-                }
-            }
-        }
-        return nil
-    }
+    class RangeSearchState {
+        public var innerState: InnerState = .initial
 
-    func firstGroupResult<Value: CalcValue>(_ id: Calc<Value>.ID) -> Calc<Value>.GroupResult?
-    where Element == Calc<Value>.ItemResult {
-        for itemResult in self {
-            switch itemResult {
-            case .line:
-                continue
-            case let .group(groupResult):
-                if groupResult.group.id == id {
-                    return groupResult
-                } else if let groupResult = groupResult.itemResults.firstGroupResult(id) {
-                    return groupResult
-                }
+        public var finished: Bool {
+            innerState == .finished
+        }
+
+        public var started: Bool {
+            if case .oneBoundFound = innerState {
+                return true
+            } else {
+                return false
             }
         }
-        return nil
+
+        public init() {}
+
+        public enum InnerState: Equatable {
+            case initial
+            case oneBoundFound(Calc.Ref)
+            case finished
+        }
+    }
+}
+
+public extension Calc.LineResult {
+    func lineResultIfInRange(
+        range: Calc.ResultRange,
+        parentGroupResult: Calc.GroupResult
+    ) -> Calc<T>.LineResult? {
+
+        func isRefDenotingLineResult(ref: Calc.Ref) -> Bool {
+            switch ref {
+            case let .line(lineId) where lineId == line.id:
+                return true
+            case let .outcomeOfGroup(groupId) where groupId == parentGroupResult.group.id &&
+                 parentGroupResult.outcomeResult.line.id == line.id:
+                // Self is the outcomeResult of its parent group, and this parent group is
+                // referenced by boundA, therefore we regard self as being in range.
+                return true
+            case .line, .outcomeOfGroup:
+                return false
+            }
+        }
+
+        switch range {
+        case .all:
+            return self
+        case let .bounded(boundA, boundB, state):
+            switch state.innerState {
+            case .initial:
+                if range.isSingle {
+                    if isRefDenotingLineResult(ref: boundA) {
+                        state.innerState = .finished
+                        return self
+                    } else {
+                        return nil
+                    }
+                } else {
+                    if isRefDenotingLineResult(ref: boundA) {
+                        state.innerState = .oneBoundFound(boundA)
+                        return self
+                    } else if isRefDenotingLineResult(ref: boundB) {
+                        state.innerState = .oneBoundFound(boundB)
+                        return self
+                    } else {
+                        return nil
+                    }
+                }
+            case let .oneBoundFound(previouslyFoundRef):
+                if boundA != previouslyFoundRef, isRefDenotingLineResult(ref: boundA) {
+                    state.innerState = .finished
+                    return self
+                } else if boundB != previouslyFoundRef, isRefDenotingLineResult(ref: boundB) {
+                    state.innerState = .finished
+                    return self
+                } else {
+                    return self
+                }
+            case .finished:
+                break
+            }
+            return self
+        }
     }
 }

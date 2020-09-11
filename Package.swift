@@ -9,13 +9,11 @@ let package = Package(
             name: "LineCalc",
             targets: ["LineCalc"]),
     ],
-    dependencies: [
-        .package(name: "NonEmpty", url: "https://github.com/pointfreeco/swift-nonempty.git", from: "0.2.2")
-    ],
+    dependencies: [],
     targets: [
         .target(
             name: "LineCalc",
-            dependencies: [.init(stringLiteral: "NonEmpty")]),
+            dependencies: []),
         .testTarget(
             name: "LineCalcTests",
             dependencies: ["LineCalc"]),
