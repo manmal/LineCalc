@@ -29,6 +29,10 @@ extension Decimal: CalcValue {
 
 public extension Calc {
 
+    init(_ groupSum: GroupSum<T>) {
+        self.group = Group(id: groupSum.id, outcome: .sum(), items: groupSum.items)
+    }
+
     enum CalcError: Error {
         case emptyGroup(ID)
     }

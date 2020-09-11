@@ -5,7 +5,7 @@ final class LineCalcTests: XCTestCase {
 
     func testGroupSum() {
         let calc = Calc<Double>(
-            group: Group(outcome: .sum()) {
+            GroupSum {
                 (3, "three")
                 (5, "five")
                 (7, "seven")
