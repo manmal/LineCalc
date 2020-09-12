@@ -44,7 +44,7 @@ public extension Calc {
             )
         }
 
-        public static func calcValueResult(_ valueResult: ValueResult, line: Line<T>, calcResult: CalcResult) -> ValueResult {
+        public static func calcValueResult(_ valueResult: ValueResult, line: Line<T, D>, calcResult: CalcResult) -> ValueResult {
             switch valueResult {
             case .calculated, .pending, .error(.errorInRef):
                 switch line.value {
@@ -81,8 +81,8 @@ public extension Calc {
                         )
                     case let .group(groupId):
                         return reduceLineRange(
-                            fromRef: .outcomeOfGroup(groupId),
-                            toRef: .outcomeOfGroup(groupId),
+                            fromRef: .byID(groupId),
+                            toRef: .byID(groupId),
                             reduce: rangeOp.reduce,
                             recursive: rangeOp.recursive,
                             forLine: line,
@@ -100,7 +100,7 @@ public extension Calc {
             toRef: Ref,
             reduce: ([T]) -> T,
             recursive: Bool,
-            forLine line: Line<T>,
+            forLine line: Line<T, D>,
             calcResult: CalcResult
         ) -> ValueResult {
             let searchState = Calc.RangeSearchState()
@@ -125,13 +125,11 @@ public extension Calc {
                     case .pending:
                         return .pending
                     case let .error(error):
-                        return .error(.errorInRef(ref: .line(lineResult.line.id), error))
+                        return .error(.errorInRef(ref: .byID(lineResult.line.id), error))
                     }
                 }
                 return .calculated(reduce(resolvedValues))
             }
-
         }
     }
-
 }

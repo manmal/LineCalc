@@ -1,7 +1,7 @@
 import Foundation
 
-public struct Calc<T: CalcValue> {
-    let group: Group<T>
+public struct Calc<T: CalcValue, D: Descriptor> {
+    let group: Group<T, D>
 
     /// Max number of iterations _after_ the first run
     let maxIterations: Int = 10
@@ -9,7 +9,11 @@ public struct Calc<T: CalcValue> {
 
 public protocol CalcValue: AdditiveArithmetic & SignedNumeric & Strideable & DefaultValueProviding {}
 
-public typealias DoubleCalc = Calc<Double>
+public protocol Descriptor: CustomStringConvertible, Equatable {}
+
+public typealias DoubleCalc = Calc<Double, String>
+
+extension String: Descriptor {}
 
 public protocol DefaultValueProviding {
     static var defaultValue: Self { get  }
@@ -29,8 +33,13 @@ extension Decimal: CalcValue {
 
 public extension Calc {
 
-    init(_ groupSum: GroupSum<T>) {
-        self.group = Group(id: groupSum.id, outcome: .sum(), items: groupSum.items)
+    init(_ groupSum: GroupSum<T, D>) {
+        self.group = Group(
+            id: groupSum.id,
+            items: groupSum.items(),
+            outcome: .sum(.default(), groupSum.descriptor),
+            descriptor: groupSum.descriptor
+        )
     }
 
     enum CalcError: Error {
