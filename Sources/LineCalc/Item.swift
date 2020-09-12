@@ -52,6 +52,10 @@ public struct Line<T: CalcValue, D: Descriptor>: Equatable {
     let descriptor: D?
 }
 
+/// Container for `Item`s. Also acts as a `Line` via the `outcome` variable.
+/// E.g. a non-recursive range operation will select the `Group`'s `outcome`
+/// as if it were a `Line`. A recursive operation will select the `Group`'s
+/// `items` instead, and disregard the `outcome`.
 public struct Group<T: CalcValue, D: Descriptor>: Equatable {
     let id: ID
     let items: [Item<T, D>]
@@ -59,9 +63,11 @@ public struct Group<T: CalcValue, D: Descriptor>: Equatable {
     let descriptor: D?
 }
 
+/// A GroupOutcome can be referenced either by its own `ID`, or
+/// by the containing Group's `ID`.
 public enum GroupOutcome<T: CalcValue, D: Descriptor>: Equatable {
-    case sum(ID = .default(), D?)
-    case product(ID = .default(), D?)
+    case sum(ID = .default(), D? = nil)
+    case product(ID = .default(), D? = nil)
     case line(Line<T, D>)
 }
 
@@ -84,7 +90,7 @@ public struct BinaryOp<T: CalcValue>: Equatable {
 
 public struct RangeOp<T: CalcValue>: Equatable {
     let scope: Scope
-    let recursive: Bool
+    let traversion: RangeTraversion
     let reduce: ([T]) -> T
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -97,14 +103,47 @@ public struct RangeOp<T: CalcValue>: Equatable {
     }
 }
 
+public enum RangeTraversion {
+    /// Selects all encountered `Line`s and also encountered `Group`s' `outcome`s.
+    case deep
+    /// Selects the `outcome` for any encountered `Group`
+    case shallow
+}
+
 public enum ValueOperation {
     case subtract
 }
 
+public extension GroupOutcome {
+    static func rangeOp(
+        fromId: String,
+        toId: String,
+        traversion: RangeTraversion,
+        id: ID = .default(),
+        descriptor: D? = nil,
+        reduce: @escaping ([T]) -> T
+    ) -> GroupOutcome {
+        .line(
+            Line(
+                id: id,
+                .rangeOp(
+                    RangeOp<T>(
+                        from: .byID(.string(fromId)),
+                        to: .byID(.string(toId)),
+                        traversion: traversion,
+                        reduce: reduce
+                    )
+                ),
+                descriptor: descriptor
+            )
+        )
+    }
+}
+
 public extension RangeOp {
 
-    init(from: Ref, to: Ref, recursive: Bool, reduce: @escaping ([T]) -> T) {
-        self.init(scope: .fromTo(from: from, to: to), recursive: recursive, reduce: reduce)
+    init(from: Ref, to: Ref, traversion: RangeTraversion, reduce: @escaping ([T]) -> T) {
+        self.init(scope: .fromTo(from: from, to: to), traversion: traversion, reduce: reduce)
     }
 }
 
@@ -121,7 +160,7 @@ public extension Line {
 
 public extension Group {
 
-    init(id: ID = .default(), outcome: GroupOutcome<T, D>, _ descriptor: D?, @Calc<T, D>.GroupBuilder items: () -> [Item<T, D>]) {
+    init(id: ID = .default(), outcome: GroupOutcome<T, D>, _ descriptor: D? = nil, @Calc<T, D>.GroupBuilder items: () -> [Item<T, D>]) {
         self.init(id: id, items: items(), outcome: outcome, descriptor: descriptor)
     }
 }
@@ -136,23 +175,23 @@ public extension Item {
         self.value(value, id: .string(idString), descriptor: descriptor)
     }
 
-    static func rangeOp(from: Ref, to: Ref, recursive: Bool, id: ID = .default(), descriptor: D?, reduce: @escaping ([T]) -> T)
+    static func rangeOp(from: Ref, to: Ref, traversion: RangeTraversion, id: ID = .default(), descriptor: D?, reduce: @escaping ([T]) -> T)
     -> Item {
         .line(
             .init(
                 id: id,
-                Value.rangeOp(RangeOp(from: from, to: to, recursive: recursive, reduce: reduce)),
+                Value.rangeOp(RangeOp(from: from, to: to, traversion: traversion, reduce: reduce)),
                 descriptor: descriptor
             )
         )
     }
 
     static func sum(from: Ref, to: Ref, id: ID = .default(), descriptor: D?) -> Item {
-        rangeOp(from: from, to: to, recursive: false, id: id, descriptor: descriptor, reduce: { $0.reduce(0, +) })
+        rangeOp(from: from, to: to, traversion: .shallow, id: id, descriptor: descriptor, reduce: { $0.reduce(0, +) })
     }
 
     static func product(id: ID = .default(), from: Ref, to: Ref, descriptor: D?) -> Item {
-        rangeOp(from: from, to: to, recursive: false, descriptor: descriptor, reduce: { $0.reduce(0, *) })
+        rangeOp(from: from, to: to, traversion: .shallow, descriptor: descriptor, reduce: { $0.reduce(0, *) })
     }
 }
 

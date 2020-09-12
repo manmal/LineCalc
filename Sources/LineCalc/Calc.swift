@@ -33,6 +33,10 @@ extension Decimal: CalcValue {
 
 public extension Calc {
 
+    init(_ group: Group<T, D>) {
+        self.group = group
+    }
+
     init(_ groupSum: GroupSum<T, D>) {
         self.group = Group(
             id: groupSum.id,

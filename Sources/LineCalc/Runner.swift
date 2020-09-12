@@ -75,7 +75,7 @@ public extension Calc {
                             fromRef: from,
                             toRef: to,
                             reduce: rangeOp.reduce,
-                            recursive: rangeOp.recursive,
+                            traversion: rangeOp.traversion,
                             forLine: line,
                             calcResult: calcResult
                         )
@@ -84,7 +84,7 @@ public extension Calc {
                             fromRef: .byID(groupId),
                             toRef: .byID(groupId),
                             reduce: rangeOp.reduce,
-                            recursive: rangeOp.recursive,
+                            traversion: rangeOp.traversion,
                             forLine: line,
                             calcResult: calcResult
                         )
@@ -99,14 +99,14 @@ public extension Calc {
             fromRef: Ref,
             toRef: Ref,
             reduce: ([T]) -> T,
-            recursive: Bool,
+            traversion: RangeTraversion,
             forLine line: Line<T, D>,
             calcResult: CalcResult
         ) -> ValueResult {
             let searchState = Calc.RangeSearchState()
             let lineResults = Array(
                 calcResult.groupResult.lineResultsInRange(
-                    range: .bounded(boundA: fromRef, boundB: toRef, recursive: recursive, state: searchState)
+                    range: .bounded(boundA: fromRef, boundB: toRef, traversion: traversion, state: searchState)
                 )
             )
 

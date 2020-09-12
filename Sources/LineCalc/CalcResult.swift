@@ -101,7 +101,7 @@ extension Calc.LineResult {
                 skeletonWithLine: Line<T, D>(
                     id: id,
                     value: .rangeOp(
-                        RangeOp(from: first.ref, to: last.ref, recursive: false, reduce: { $0.reduce(0, +) })
+                        RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: { $0.reduce(0, +) })
                     ),
                     descriptor: descriptor
                 )
@@ -116,7 +116,7 @@ extension Calc.LineResult {
                 skeletonWithLine: Line<T, D>(
                     id: id,
                     value: .rangeOp(
-                        RangeOp(from: first.ref, to: last.ref, recursive: false, reduce: { $0.reduce(0, *) })
+                        RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: { $0.reduce(0, *) })
                     ),
                     descriptor: descriptor
                 )
@@ -209,14 +209,14 @@ public extension Calc.GroupResult {
                 switch range {
                 case let .bounded(_, _, _, state) where state.finished:
                     return .init([])
-                case .all, .bounded:
+                case .bounded, .all:
                     break
                 }
 
                 switch itemResult {
                 case let .group(groupResult):
                     switch range {
-                    case .all, .bounded(_, _, recursive: true, _):
+                    case .all, .bounded(_, _, .deep, _):
                         return groupResult.lineResultsInRange(range: range)
                     case let .bounded(_, _, _, state):
                         if state.started {
@@ -261,7 +261,7 @@ public extension Calc.GroupResult {
 public extension Calc {
     enum ResultRange {
         case all
-        case bounded(boundA: Ref, boundB: Ref, recursive: Bool, state: Calc.RangeSearchState = .init())
+        case bounded(boundA: Ref, boundB: Ref, traversion: RangeTraversion, state: Calc.RangeSearchState = .init())
 
         public var isSingle: Bool {
             switch self {
@@ -273,7 +273,7 @@ public extension Calc {
         }
 
         public static func single(_ ref: Ref) -> ResultRange {
-            bounded(boundA: ref, boundB: ref, recursive: false)
+            bounded(boundA: ref, boundB: ref, traversion: .shallow)
         }
     }
 

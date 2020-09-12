@@ -32,6 +32,81 @@ final class LineCalcTests: XCTestCase {
         XCTAssertEqual(result.outcomeResult.valueResult.value, 66)
     }
 
+    func testDeepRangeOpAcrossGroupSum() {
+        let calc = Calc<Double, String>(
+            Group<Double, String>(
+                outcome: .rangeOp(
+                    fromId: "three",
+                    toId: "seven",
+                    traversion: .deep,
+                    reduce: { $0.reduce(0, +) }
+                )
+            ) {
+                (3, "three", nil)
+                GroupSum {
+                    5
+                }
+                (7, "seven", nil)
+            }
+        )
+        let result = DoubleCalc.Runner.run(calc).groupResult
+
+        // Deep traversal means that every group's items are added,
+        // in addition to the Group's outcome. Hence, the result is:
+        // 3 + (5 + 5 [outcome]) + 7
+        XCTAssertEqual(result.outcomeResult.valueResult.value, 20)
+    }
+
+    func testDeepRangeOpForNestedGroupSums() {
+        let calc = Calc<Double, String>(
+            Group<Double, String>(
+                outcome: .rangeOp(
+                    fromId: "three",
+                    toId: "groupSum",
+                    traversion: .deep,
+                    reduce: { $0.reduce(0, +) }
+                )
+            ) {
+                (3, "three", nil)
+                GroupSum("groupSum") {
+                    5
+                    GroupSum {
+                        7
+                    }
+                }
+            }
+        )
+        let result = DoubleCalc.Runner.run(calc).groupResult
+
+        // Deep traversal means that every group's items are added,
+        // in addition to the Group's outcome. Hence, the result is:
+        // 3 + (5 + (7 + 7 [outcome]) + (5 + 7) [outcome])
+        XCTAssertEqual(result.outcomeResult.valueResult.value, 34)
+    }
+
+    func testShallowRangeOpForNestedGroupSums() {
+        let calc = Calc<Double, String>(
+            Group<Double, String>(
+                outcome: .rangeOp(
+                    fromId: "three",
+                    toId: "groupSum",
+                    traversion: .shallow,
+                    reduce: { $0.reduce(0, +) }
+                )
+            ) {
+                (3, "three", nil)
+                GroupSum("groupSum") {
+                    5
+                    GroupSum {
+                        7
+                    }
+                }
+            }
+        )
+        let result = DoubleCalc.Runner.run(calc).groupResult
+        XCTAssertEqual(result.outcomeResult.valueResult.value, 15)
+    }
+
     static var allTests = [
         ("testGroupSum", testGroupSum),
     ]
