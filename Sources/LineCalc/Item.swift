@@ -225,13 +225,13 @@ public struct GroupSum<T: CalcValue, D: Descriptor> {
     let items: () -> [Item<T, D>]
     let descriptor: D?
 
-    init(id: ID = .default(), descriptor: D? = nil, @Calc<T, D>.GroupBuilder items: @escaping () -> [Item<T, D>]) {
+    public init(id: ID = .default(), descriptor: D? = nil, @Calc<T, D>.GroupBuilder items: @escaping () -> [Item<T, D>]) {
         self.id = id
         self.items = items
         self.descriptor = descriptor
     }
 
-    init(_ idString: String, descriptor: D? = nil, @Calc<T, D>.GroupBuilder items: @escaping () -> [Item<T, D>]) {
+    public init(_ idString: String, descriptor: D? = nil, @Calc<T, D>.GroupBuilder items: @escaping () -> [Item<T, D>]) {
         self.init(id: .string(idString), descriptor: descriptor, items: items)
     }
 }
