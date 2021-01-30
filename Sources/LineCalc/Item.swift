@@ -1,8 +1,8 @@
 import Foundation
 
 public indirect enum Item<D: Descriptor>: Equatable {
-    case line(Line<D>)
-    case group(Group<D>)
+    case line(Line)
+    case group(Group)
 
     var id: ID {
         switch self {
@@ -57,41 +57,43 @@ public enum Ref: Hashable {
     }
 }
 
-public struct Line<D: Descriptor>: Equatable {
-    let id: ID
-    let value: Value
-    let descriptor: D?
-}
+public extension Item {
+    struct Line: Equatable {
+        public let id: ID
+        public let value: Value
+        public let descriptor: D?
+    }
 
-/// Container for `Item`s. Also acts as a `Line` via the `outcome` variable.
-/// E.g. a non-recursive range operation will select the `Group`'s `outcome`
-/// as if it were a `Line`. A recursive operation will select the `Group`'s
-/// `items` instead, and disregard the `outcome`.
-public struct Group<D: Descriptor>: Equatable {
-    let id: ID
-    let items: [Item<D>]
-    let outcome: GroupOutcome<D>
-    let descriptor: D?
-}
+    /// Container for `Item`s. Also acts as a `Line` via the `outcome` variable.
+    /// E.g. a non-recursive range operation will select the `Group`'s `outcome`
+    /// as if it were a `Line`. A recursive operation will select the `Group`'s
+    /// `items` instead, and disregard the `outcome`.
+    struct Group: Equatable {
+        public let id: ID
+        public let items: [Item<D>]
+        public let outcome: GroupOutcome
+        public let descriptor: D?
+    }
 
-/// A GroupOutcome can be referenced either by its own `ID`, or
-/// by the containing Group's `ID`.
-public enum GroupOutcome<D: Descriptor>: Equatable {
-    case sum(ID = .default(), descriptor: D? = nil)
-    case product(ID = .default(), D? = nil)
-    case op(ID = .default(), D? = nil, op: GroupOp)
-    case line(Line<D>)
+    /// A GroupOutcome can be referenced either by its own `ID`, or
+    /// by the containing Group's `ID`.
+    enum GroupOutcome: Equatable {
+        case sum(ID = .default(), descriptor: D? = nil)
+        case product(ID = .default(), D? = nil)
+        case op(ID = .default(), D? = nil, op: GroupOp)
+        case line(Line)
 
-    public struct GroupOp: Equatable {
-        private let uuid = UUID()
-        public let reduce: ([Double]) -> Double
+        public struct GroupOp: Equatable {
+            private let uuid = UUID()
+            public let reduce: ([Double]) -> Double
 
-        public init(_ reduce: @escaping ([Double]) -> Double) {
-            self.reduce = reduce
-        }
+            public init(_ reduce: @escaping ([Double]) -> Double) {
+                self.reduce = reduce
+            }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            lhs.uuid == rhs.uuid
+            public static func == (lhs: Self, rhs: Self) -> Bool {
+                lhs.uuid == rhs.uuid
+            }
         }
     }
 }
@@ -179,7 +181,7 @@ public enum ValueOperation {
     case subtract
 }
 
-public extension GroupOutcome {
+public extension Item.GroupOutcome {
     static func rangeOp(
         fromId: String,
         toId: String,
@@ -187,9 +189,9 @@ public extension GroupOutcome {
         id: ID = .default(),
         descriptor: D? = nil,
         reduce: @escaping ([Double]) -> Double
-    ) -> GroupOutcome {
+    ) -> Item.GroupOutcome {
         .line(
-            Line(
+            Item.Line(
                 id: id,
                 .rangeOp(
                     RangeOp(
@@ -212,7 +214,7 @@ public extension RangeOp {
     }
 }
 
-public extension Line {
+public extension Item.Line {
 
     init(id: ID = .default(), _ immutableValue: Double, descriptor: D?) {
         self.init(id: id, .plain(immutableValue), descriptor: descriptor)
@@ -223,9 +225,9 @@ public extension Line {
     }
 }
 
-public extension Group {
+public extension Item.Group {
 
-    init(id: ID = .default(), outcome: GroupOutcome<D>, descriptor: D? = nil, @Calc<D>.GroupBuilder items: () -> [Item<D>]) {
+    init(id: ID = .default(), outcome: Item.GroupOutcome, descriptor: D? = nil, @Calc<D>.GroupBuilder items: () -> [Item<D>]) {
         self.init(id: id, items: items(), outcome: outcome, descriptor: descriptor)
     }
 }

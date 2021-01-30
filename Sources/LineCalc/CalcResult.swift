@@ -12,12 +12,12 @@ public extension Calc {
     }
 
     struct LineResult {
-        public let line: Line<D>
+        public let line: Item<D>.Line
         public let valueResult: ValueResult
     }
 
     struct GroupResult {
-        public let group: Group<D>
+        public let group: Item<D>.Group
         public let outcomeResult: LineResult
         public let itemResults: [ItemResult]
     }
@@ -74,7 +74,7 @@ extension Calc.ItemResult {
 
 extension Calc.GroupResult {
 
-    init(skeletonWithGroup group: Group<D>) {
+    init(skeletonWithGroup group: Item<D>.Group) {
         let itemResults = group.items.map(Calc.ItemResult.init(skeletonWithItem:))
         self = .init(
             group: group,
@@ -91,7 +91,7 @@ extension Calc.GroupResult {
 
 extension Calc.LineResult {
 
-    init(skeletonWithLine line: Line<D>) {
+    init(skeletonWithLine line: Item<D>.Line) {
         let valueResult: Calc.ValueResult = {
             switch line.value {
             case let .plain(value):
@@ -103,7 +103,7 @@ extension Calc.LineResult {
         self = Calc.LineResult(line: line, valueResult: valueResult)
     }
 
-    init(skeletonWithGroupOutcome outcome: GroupOutcome<D>, groupItemResults: [Calc.ItemResult]) {
+    init(skeletonWithGroupOutcome outcome: Item<D>.GroupOutcome, groupItemResults: [Calc.ItemResult]) {
         switch outcome {
         case let .line(line):
             self.init(skeletonWithLine: line)
@@ -115,7 +115,7 @@ extension Calc.LineResult {
             }
 
             self.init(
-                skeletonWithLine: Line<D>(
+                skeletonWithLine: Item<D>.Line(
                     id: id,
                     value: .rangeOp(
                         RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: { $0.reduce(0, +) })
@@ -131,7 +131,7 @@ extension Calc.LineResult {
             }
 
             self.init(
-                skeletonWithLine: Line<D>(
+                skeletonWithLine: Item<D>.Line(
                     id: id,
                     value: .rangeOp(
                         RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: { $0.reduce(0, *) })
@@ -147,7 +147,7 @@ extension Calc.LineResult {
             }
 
             self.init(
-                skeletonWithLine: Line<D>(
+                skeletonWithLine: Item<D>.Line(
                     id: id,
                     value: .rangeOp(
                         RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: groupOp.reduce)

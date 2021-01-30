@@ -8,11 +8,11 @@ public extension Calc {
             components
         }
 
-        public static func buildExpression(_ line: Line<D>) -> Item<D> {
+        public static func buildExpression(_ line: Item<D>.Line) -> Item<D> {
             .line(line)
         }
 
-        public static func buildExpression(_ group: Group<D>) -> Item<D> {
+        public static func buildExpression(_ group: Item<D>.Group) -> Item<D> {
             .group(group)
         }
 
@@ -34,7 +34,7 @@ public extension Calc {
 
         public static func buildExpression(_ groupSum: GroupSum<D>) -> Item<D> {
             .group(
-                Group<D>(
+                Item<D>.Group(
                     id: groupSum.id,
                     outcome: .sum(
                         .default(),

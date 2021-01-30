@@ -1,7 +1,7 @@
 import Foundation
 
 public struct Calc<D: Descriptor> {
-    let group: Group<D>
+    let group: Item<D>.Group
 
     /// Max number of iterations _after_ the first run
     let maxIterations: Int = 10
@@ -37,12 +37,12 @@ extension Decimal: CalcValue {
 
 public extension Calc {
 
-    init(_ group: Group<D>) {
+    init(_ group: Item<D>.Group) {
         self.group = group
     }
 
     init(_ groupSum: GroupSum<D>) {
-        self.group = Group(
+        self.group = Item<D>.Group(
             id: groupSum.id,
             items: groupSum.items(),
             outcome: .sum(.default(), descriptor: groupSum.descriptor),

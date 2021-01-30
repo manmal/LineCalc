@@ -44,7 +44,8 @@ public extension Calc {
             )
         }
 
-        public static func calcValueResult(_ valueResult: ValueResult, line: Line<D>, calcResult: CalcResult) -> ValueResult {
+        public static func calcValueResult(_ valueResult: ValueResult, line: Item<D>.Line, calcResult: CalcResult)
+        -> ValueResult {
             switch valueResult {
             case .calculated, .pending, .error(.errorInRef):
                 switch line.value {
@@ -145,7 +146,7 @@ public extension Calc {
             toRef: Ref,
             reduce: ([Double]) -> Double,
             traversion: RangeTraversion,
-            forLine line: Line<D>,
+            forLine line: Item<D>.Line,
             calcResult: CalcResult
         ) -> ValueResult {
             let searchState = Calc.RangeSearchState()
