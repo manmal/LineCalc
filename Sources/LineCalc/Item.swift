@@ -1,8 +1,8 @@
 import Foundation
 
-public indirect enum Item<T: CalcValue, D: Descriptor>: Equatable {
-    case line(Line<T, D>)
-    case group(Group<T, D>)
+public indirect enum Item<D: Descriptor>: Equatable {
+    case line(Line<D>)
+    case group(Group<D>)
 
     var id: ID {
         switch self {
@@ -57,9 +57,9 @@ public enum Ref: Hashable {
     }
 }
 
-public struct Line<T: CalcValue, D: Descriptor>: Equatable {
+public struct Line<D: Descriptor>: Equatable {
     let id: ID
-    let value: Value<T>
+    let value: Value
     let descriptor: D?
 }
 
@@ -67,26 +67,26 @@ public struct Line<T: CalcValue, D: Descriptor>: Equatable {
 /// E.g. a non-recursive range operation will select the `Group`'s `outcome`
 /// as if it were a `Line`. A recursive operation will select the `Group`'s
 /// `items` instead, and disregard the `outcome`.
-public struct Group<T: CalcValue, D: Descriptor>: Equatable {
+public struct Group<D: Descriptor>: Equatable {
     let id: ID
-    let items: [Item<T, D>]
-    let outcome: GroupOutcome<T, D>
+    let items: [Item<D>]
+    let outcome: GroupOutcome<D>
     let descriptor: D?
 }
 
 /// A GroupOutcome can be referenced either by its own `ID`, or
 /// by the containing Group's `ID`.
-public enum GroupOutcome<T: CalcValue, D: Descriptor>: Equatable {
+public enum GroupOutcome<D: Descriptor>: Equatable {
     case sum(ID = .default(), descriptor: D? = nil)
     case product(ID = .default(), D? = nil)
     case op(ID = .default(), D? = nil, op: GroupOp)
-    case line(Line<T, D>)
+    case line(Line<D>)
 
     public struct GroupOp: Equatable {
         private let uuid = UUID()
-        public let reduce: ([T]) -> T
+        public let reduce: ([Double]) -> Double
 
-        public init(_ reduce: @escaping ([T]) -> T) {
+        public init(_ reduce: @escaping ([Double]) -> Double) {
             self.reduce = reduce
         }
 
@@ -96,20 +96,20 @@ public enum GroupOutcome<T: CalcValue, D: Descriptor>: Equatable {
     }
 }
 
-public indirect enum Value<T: CalcValue>: Equatable {
-    case plain(T)
+public indirect enum Value: Equatable {
+    case plain(Double)
     case reference(Ref)
-    case transformedReference(UnaryOp<T>)
-    case binaryOp(BinaryOp<T>)
-    case ternaryOp(TernaryOp<T>)
-    case rangeOp(RangeOp<T>)
+    case transformedReference(UnaryOp)
+    case binaryOp(BinaryOp)
+    case ternaryOp(TernaryOp)
+    case rangeOp(RangeOp)
 }
 
-public struct UnaryOp<T: CalcValue>: Equatable {
+public struct UnaryOp: Equatable {
     let ref: Ref
-    let op: (T) -> T
+    let op: (Double) -> Double
 
-    public init(ref: Ref, op: @escaping (T) -> T) {
+    public init(ref: Ref, op: @escaping (Double) -> Double) {
         self.ref = ref
         self.op = op
     }
@@ -119,12 +119,12 @@ public struct UnaryOp<T: CalcValue>: Equatable {
     }
 }
 
-public struct BinaryOp<T: CalcValue>: Equatable {
+public struct BinaryOp: Equatable {
     let a: Ref
     let b: Ref
-    let op: (T, T) -> T
+    let op: (Double, Double) -> Double
 
-    public init(a: Ref, b: Ref, op: @escaping (T, T) -> T) {
+    public init(a: Ref, b: Ref, op: @escaping (Double, Double) -> Double) {
         self.a = a
         self.b = b
         self.op = op
@@ -135,13 +135,13 @@ public struct BinaryOp<T: CalcValue>: Equatable {
     }
 }
 
-public struct TernaryOp<T: CalcValue>: Equatable {
+public struct TernaryOp: Equatable {
     let a: Ref
     let b: Ref
     let c: Ref
-    let op: (T, T, T) -> T
+    let op: (Double, Double, Double) -> Double
 
-    public init(a: Ref, b: Ref, c: Ref, op: @escaping (T, T, T) -> T) {
+    public init(a: Ref, b: Ref, c: Ref, op: @escaping (Double, Double, Double) -> Double) {
         self.a = a
         self.b = b
         self.c = c
@@ -153,10 +153,10 @@ public struct TernaryOp<T: CalcValue>: Equatable {
     }
 }
 
-public struct RangeOp<T: CalcValue>: Equatable {
+public struct RangeOp: Equatable {
     let scope: Scope
     let traversion: RangeTraversion
-    let reduce: ([T]) -> T
+    let reduce: ([Double]) -> Double
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.scope == rhs.scope
@@ -186,13 +186,13 @@ public extension GroupOutcome {
         traversion: RangeTraversion,
         id: ID = .default(),
         descriptor: D? = nil,
-        reduce: @escaping ([T]) -> T
+        reduce: @escaping ([Double]) -> Double
     ) -> GroupOutcome {
         .line(
             Line(
                 id: id,
                 .rangeOp(
-                    RangeOp<T>(
+                    RangeOp(
                         from: .byID(.string(fromId)),
                         to: .byID(.string(toId)),
                         traversion: traversion,
@@ -207,25 +207,25 @@ public extension GroupOutcome {
 
 public extension RangeOp {
 
-    init(from: Ref, to: Ref, traversion: RangeTraversion, reduce: @escaping ([T]) -> T) {
+    init(from: Ref, to: Ref, traversion: RangeTraversion, reduce: @escaping ([Double]) -> Double) {
         self.init(scope: .fromTo(from: from, to: to), traversion: traversion, reduce: reduce)
     }
 }
 
 public extension Line {
 
-    init(id: ID = .default(), _ immutableValue: T, descriptor: D?) {
+    init(id: ID = .default(), _ immutableValue: Double, descriptor: D?) {
         self.init(id: id, .plain(immutableValue), descriptor: descriptor)
     }
 
-    init(id: ID = .default(), _ value: Value<T>, descriptor: D? = nil) {
+    init(id: ID = .default(), _ value: Value, descriptor: D? = nil) {
         self.init(id: id, value: value, descriptor: descriptor)
     }
 }
 
 public extension Group {
 
-    init(id: ID = .default(), outcome: GroupOutcome<T, D>, descriptor: D? = nil, @Calc<T, D>.GroupBuilder items: () -> [Item<T, D>]) {
+    init(id: ID = .default(), outcome: GroupOutcome<D>, descriptor: D? = nil, @Calc<D>.GroupBuilder items: () -> [Item<D>]) {
         self.init(id: id, items: items(), outcome: outcome, descriptor: descriptor)
     }
 }
@@ -239,15 +239,15 @@ public extension Value {
 
 public extension Item {
 
-    static func value(_ value: T, id: ID = .default(), descriptor: D?) -> Item {
+    static func value(_ value: Double, id: ID = .default(), descriptor: D?) -> Item {
         .line(.init(id: id, value, descriptor: descriptor))
     }
 
-    static func value(_ value: T, id idString: String, descriptor: D?) -> Item {
+    static func value(_ value: Double, id idString: String, descriptor: D?) -> Item {
         self.value(value, id: .string(idString), descriptor: descriptor)
     }
 
-    static func rangeOp(from: Ref, to: Ref, traversion: RangeTraversion, id: ID = .default(), descriptor: D?, reduce: @escaping ([T]) -> T)
+    static func rangeOp(from: Ref, to: Ref, traversion: RangeTraversion, id: ID = .default(), descriptor: D?, reduce: @escaping ([Double]) -> Double)
     -> Item {
         .line(
             .init(
@@ -292,18 +292,18 @@ public struct Sum<D: Descriptor> {
     }
 }
 
-public struct GroupSum<T: CalcValue, D: Descriptor> {
+public struct GroupSum<D: Descriptor> {
     public let id: ID
-    public let items: () -> [Item<T, D>]
+    public let items: () -> [Item<D>]
     public let descriptor: D?
 
-    public init(id: ID = .default(), descriptor: D? = nil, @Calc<T, D>.GroupBuilder items: @escaping () -> [Item<T, D>]) {
+    public init(id: ID = .default(), descriptor: D? = nil, @Calc<D>.GroupBuilder items: @escaping () -> [Item<D>]) {
         self.id = id
         self.items = items
         self.descriptor = descriptor
     }
 
-    public init(_ idString: String, descriptor: D? = nil, @Calc<T, D>.GroupBuilder items: @escaping () -> [Item<T, D>]) {
+    public init(_ idString: String, descriptor: D? = nil, @Calc<D>.GroupBuilder items: @escaping () -> [Item<D>]) {
         self.init(id: .string(idString), descriptor: descriptor, items: items)
     }
 }

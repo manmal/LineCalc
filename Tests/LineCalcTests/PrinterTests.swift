@@ -4,7 +4,7 @@ import XCTest
 final class PrinterTests: XCTestCase {
 
     func testGroupSumPrinting() {
-        let calc = Calc<Double, String>(
+        let calc = Calc<String>(
             GroupSum(descriptor: "GroupSum 1") {
                 (3, "three", "Three")
                 (5, "five", "Five")

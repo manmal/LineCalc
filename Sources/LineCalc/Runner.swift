@@ -44,7 +44,7 @@ public extension Calc {
             )
         }
 
-        public static func calcValueResult(_ valueResult: ValueResult, line: Line<T, D>, calcResult: CalcResult) -> ValueResult {
+        public static func calcValueResult(_ valueResult: ValueResult, line: Line<D>, calcResult: CalcResult) -> ValueResult {
             switch valueResult {
             case .calculated, .pending, .error(.errorInRef):
                 switch line.value {
@@ -143,9 +143,9 @@ public extension Calc {
         static func reduceLineRange(
             fromRef: Ref,
             toRef: Ref,
-            reduce: ([T]) -> T,
+            reduce: ([Double]) -> Double,
             traversion: RangeTraversion,
-            forLine line: Line<T, D>,
+            forLine line: Line<D>,
             calcResult: CalcResult
         ) -> ValueResult {
             let searchState = Calc.RangeSearchState()
@@ -162,7 +162,7 @@ public extension Calc {
                 let unfoundBound = foundBound == fromRef ? toRef : fromRef
                 return .error(.rangeToNotFound(source: line.id, rangeToRef: unfoundBound))
             case .finished:
-                var resolvedValues = [T]()
+                var resolvedValues = [Double]()
                 for lineResult in lineResults {
                     switch lineResult.valueResult {
                     case let .immutable(value), let .calculated(value):

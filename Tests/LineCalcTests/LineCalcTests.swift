@@ -4,7 +4,7 @@ import XCTest
 final class LineCalcTests: XCTestCase {
 
     func testGroupSum() {
-        let calc = Calc<Double, String>(
+        let calc = Calc<String>(
             GroupSum {
                 (3, "three", nil)
                 (5, "five", nil)
@@ -33,8 +33,8 @@ final class LineCalcTests: XCTestCase {
     }
 
     func testDeepRangeOpAcrossGroupSum() {
-        let calc = Calc<Double, String>(
-            Group<Double, String>(
+        let calc = Calc<String>(
+            Group<String>(
                 outcome: .rangeOp(
                     fromId: "three",
                     toId: "seven",
@@ -58,8 +58,8 @@ final class LineCalcTests: XCTestCase {
     }
 
     func testDeepRangeOpForNestedGroupSums() {
-        let calc = Calc<Double, String>(
-            Group<Double, String>(
+        let calc = Calc<String>(
+            Group<String>(
                 outcome: .rangeOp(
                     fromId: "three",
                     toId: "groupSum",
@@ -85,8 +85,8 @@ final class LineCalcTests: XCTestCase {
     }
 
     func testShallowRangeOpForNestedGroupSums() {
-        let calc = Calc<Double, String>(
-            Group<Double, String>(
+        let calc = Calc<String>(
+            Group<String>(
                 outcome: .rangeOp(
                     fromId: "three",
                     toId: "groupSum",

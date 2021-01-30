@@ -1,7 +1,7 @@
 import Foundation
 
-public struct Calc<T: CalcValue, D: Descriptor> {
-    let group: Group<T, D>
+public struct Calc<D: Descriptor> {
+    let group: Group<D>
 
     /// Max number of iterations _after_ the first run
     let maxIterations: Int = 10
@@ -11,7 +11,7 @@ public protocol CalcValue: AdditiveArithmetic & SignedNumeric & Strideable & Def
 
 public protocol Descriptor: CustomStringConvertible, Equatable {}
 
-public typealias DoubleCalc = Calc<Double, String>
+public typealias DoubleCalc = Calc<String>
 
 extension String: Descriptor {}
 
@@ -37,11 +37,11 @@ extension Decimal: CalcValue {
 
 public extension Calc {
 
-    init(_ group: Group<T, D>) {
+    init(_ group: Group<D>) {
         self.group = group
     }
 
-    init(_ groupSum: GroupSum<T, D>) {
+    init(_ groupSum: GroupSum<D>) {
         self.group = Group(
             id: groupSum.id,
             items: groupSum.items(),

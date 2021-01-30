@@ -12,30 +12,30 @@ public extension Calc {
     }
 
     struct LineResult {
-        public let line: Line<T, D>
+        public let line: Line<D>
         public let valueResult: ValueResult
     }
 
     struct GroupResult {
-        public let group: Group<T, D>
+        public let group: Group<D>
         public let outcomeResult: LineResult
         public let itemResults: [ItemResult]
     }
 
     enum ValueResult {
-        case immutable(T)
-        case calculated(T)
+        case immutable(Double)
+        case calculated(Double)
         case pending
         case error(ValueError)
 
-        public var value: T? {
+        public var value: Double? {
             switch self {
             case let .immutable(value):
                 return value
             case let .calculated(value):
                 return value
             case .pending:
-                return T.pendingCalculationValue
+                return Double.pendingCalculationValue
             case .error:
                 return nil
             }
@@ -53,7 +53,7 @@ public extension Calc {
 
 extension Calc.ItemResult {
 
-    init(skeletonWithItem item: Item<T, D>) {
+    init(skeletonWithItem item: Item<D>) {
         switch item {
         case let .group(group):
             self = .group(Calc.GroupResult(skeletonWithGroup: group))
@@ -74,7 +74,7 @@ extension Calc.ItemResult {
 
 extension Calc.GroupResult {
 
-    init(skeletonWithGroup group: Group<T, D>) {
+    init(skeletonWithGroup group: Group<D>) {
         let itemResults = group.items.map(Calc.ItemResult.init(skeletonWithItem:))
         self = .init(
             group: group,
@@ -91,7 +91,7 @@ extension Calc.GroupResult {
 
 extension Calc.LineResult {
 
-    init(skeletonWithLine line: Line<T, D>) {
+    init(skeletonWithLine line: Line<D>) {
         let valueResult: Calc.ValueResult = {
             switch line.value {
             case let .plain(value):
@@ -103,7 +103,7 @@ extension Calc.LineResult {
         self = Calc.LineResult(line: line, valueResult: valueResult)
     }
 
-    init(skeletonWithGroupOutcome outcome: GroupOutcome<T, D>, groupItemResults: [Calc.ItemResult]) {
+    init(skeletonWithGroupOutcome outcome: GroupOutcome<D>, groupItemResults: [Calc.ItemResult]) {
         switch outcome {
         case let .line(line):
             self.init(skeletonWithLine: line)
@@ -115,7 +115,7 @@ extension Calc.LineResult {
             }
 
             self.init(
-                skeletonWithLine: Line<T, D>(
+                skeletonWithLine: Line<D>(
                     id: id,
                     value: .rangeOp(
                         RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: { $0.reduce(0, +) })
@@ -131,7 +131,7 @@ extension Calc.LineResult {
             }
 
             self.init(
-                skeletonWithLine: Line<T, D>(
+                skeletonWithLine: Line<D>(
                     id: id,
                     value: .rangeOp(
                         RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: { $0.reduce(0, *) })
@@ -147,7 +147,7 @@ extension Calc.LineResult {
             }
 
             self.init(
-                skeletonWithLine: Line<T, D>(
+                skeletonWithLine: Line<D>(
                     id: id,
                     value: .rangeOp(
                         RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: groupOp.reduce)
@@ -298,11 +298,11 @@ public extension Calc.GroupResult {
         firstLineResultInRange(range: .single(ref))
     }
 
-    func value(at ref: Ref) -> T? {
+    func value(at ref: Ref) -> Double? {
         lineResult(at: ref)?.valueResult.value
     }
 
-    func value(atLine lineIdString: String) -> T? {
+    func value(atLine lineIdString: String) -> Double? {
         value(at: .init(lineIdString))
     }
 
@@ -356,7 +356,7 @@ public extension Calc.LineResult {
     func lineResultIfInRange(
         range: Calc.ResultRange,
         parentGroupResult: Calc.GroupResult
-    ) -> Calc<T, D>.LineResult? {
+    ) -> Calc<D>.LineResult? {
 
         func isRefDenotingLineResult(ref: Ref) -> Bool {
             switch ref {

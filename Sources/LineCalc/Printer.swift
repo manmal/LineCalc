@@ -11,11 +11,11 @@ public struct Printer<D: Descriptor> {
         self.maxDepth = maxDepth
     }
 
-    public func print(_ calcResult: Calc<T, D>.CalcResult) -> [String] {
+    public func print(_ calcResult: Calc<D>.CalcResult) -> [String] {
         print(calcResult.groupResult, level: 0)
     }
 
-    public func print(_ groupResult: Calc<T, D>.GroupResult, level: Int) -> [String] {
+    public func print(_ groupResult: Calc<D>.GroupResult, level: Int) -> [String] {
         if level < maxDepth {
             let contents = groupResult.itemResults.enumerated().flatMap { print($1, level: level + 1, indexInGroup: $0) }
             let header = GroupSeparator
@@ -33,7 +33,7 @@ public struct Printer<D: Descriptor> {
         }
     }
 
-    public func print(_ itemResult: Calc<T, D>.ItemResult, level: Int, indexInGroup: Int) -> [String] {
+    public func print(_ itemResult: Calc<D>.ItemResult, level: Int, indexInGroup: Int) -> [String] {
         switch itemResult {
         case let .line(lineResult):
             return [print(lineResult, level: level, indexInGroup: indexInGroup)]
@@ -42,7 +42,7 @@ public struct Printer<D: Descriptor> {
         }
     }
 
-    public func print<D>(_ lineResult: Calc<T, D>.LineResult, level: Int, indexInGroup: Int) -> String {
+    public func print<D>(_ lineResult: Calc<D>.LineResult, level: Int, indexInGroup: Int) -> String {
         let nf = NumberFormatter()
         nf.numberStyle = .decimal
         nf.groupingSeparator = "."
@@ -93,14 +93,14 @@ private extension Printer {
         return nf
     }
 
-    private static func currencyString<D: Descriptor>(_ valueResult: Calc<T, D>.ValueResult) -> String {
+    private static func currencyString<D: Descriptor>(_ valueResult: Calc<D>.ValueResult) -> String {
         (valueResult.value).map { currencyFormatter.string(from: NSNumber(value: $0)) ?? "-" } ?? "undefined"
     }
 
     enum GroupSeparator {
         case header(descriptor: D?)
         case bottomSeparator
-        case outcome(valueResult: Calc<T, D>.ValueResult, descriptor: D?)
+        case outcome(valueResult: Calc<D>.ValueResult, descriptor: D?)
         case emptyLineAboveOrBelowGroup
 
         func print(level: Int, lineLength: Int) -> String {
