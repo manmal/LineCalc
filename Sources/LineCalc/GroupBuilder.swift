@@ -33,7 +33,17 @@ public extension Calc {
         }
 
         public static func buildExpression(_ groupSum: GroupSum<T, D>) -> Item<T, D> {
-            .group(Group<T, D>(id: groupSum.id, outcome: .sum(.default(), groupSum.descriptor), groupSum.descriptor, items: groupSum.items))
+            .group(
+                Group<T, D>(
+                    id: groupSum.id,
+                    outcome: .sum(
+                        .default(),
+                        descriptor: groupSum.descriptor
+                    ),
+                    descriptor: groupSum.descriptor,
+                    items: groupSum.items
+                )
+            )
         }
     }
 

@@ -23,7 +23,7 @@ public indirect enum Item<T: CalcValue, D: Descriptor>: Equatable {
     }
 }
 
-public enum ID: Hashable {
+public enum ID: Hashable, CustomDebugStringConvertible {
     case `default`(OpaqueID = .init())
     case uuid(UUID = UUID())
     case string(String)
@@ -35,6 +35,17 @@ public enum ID: Hashable {
 
     public init(_ string: String) {
         self = .string(string)
+    }
+
+    public var debugDescription: String {
+        switch self {
+        case .default:
+            return "Opaque ID"
+        case let .uuid(uuid):
+            return uuid.uuidString
+        case let .string(value):
+            return value
+        }
     }
 }
 
@@ -66,16 +77,46 @@ public struct Group<T: CalcValue, D: Descriptor>: Equatable {
 /// A GroupOutcome can be referenced either by its own `ID`, or
 /// by the containing Group's `ID`.
 public enum GroupOutcome<T: CalcValue, D: Descriptor>: Equatable {
-    case sum(ID = .default(), D? = nil)
+    case sum(ID = .default(), descriptor: D? = nil)
     case product(ID = .default(), D? = nil)
+    case op(ID = .default(), D? = nil, op: GroupOp)
     case line(Line<T, D>)
+
+    public struct GroupOp: Equatable {
+        private let uuid = UUID()
+        public let reduce: ([T]) -> T
+
+        public init(_ reduce: @escaping ([T]) -> T) {
+            self.reduce = reduce
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.uuid == rhs.uuid
+        }
+    }
 }
 
 public indirect enum Value<T: CalcValue>: Equatable {
     case plain(T)
     case reference(Ref)
+    case transformedReference(UnaryOp<T>)
     case binaryOp(BinaryOp<T>)
+    case ternaryOp(TernaryOp<T>)
     case rangeOp(RangeOp<T>)
+}
+
+public struct UnaryOp<T: CalcValue>: Equatable {
+    let ref: Ref
+    let op: (T) -> T
+
+    public init(ref: Ref, op: @escaping (T) -> T) {
+        self.ref = ref
+        self.op = op
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.ref == rhs.ref
+    }
 }
 
 public struct BinaryOp<T: CalcValue>: Equatable {
@@ -83,8 +124,32 @@ public struct BinaryOp<T: CalcValue>: Equatable {
     let b: Ref
     let op: (T, T) -> T
 
+    public init(a: Ref, b: Ref, op: @escaping (T, T) -> T) {
+        self.a = a
+        self.b = b
+        self.op = op
+    }
+
     public static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.a == rhs.a && lhs.b == rhs.b
+    }
+}
+
+public struct TernaryOp<T: CalcValue>: Equatable {
+    let a: Ref
+    let b: Ref
+    let c: Ref
+    let op: (T, T, T) -> T
+
+    public init(a: Ref, b: Ref, c: Ref, op: @escaping (T, T, T) -> T) {
+        self.a = a
+        self.b = b
+        self.c = c
+        self.op = op
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.a == rhs.a && lhs.b == rhs.b && lhs.c == rhs.c
     }
 }
 
@@ -153,15 +218,22 @@ public extension Line {
         self.init(id: id, .plain(immutableValue), descriptor: descriptor)
     }
 
-    init(id: ID = .default(), _ value: Value<T>, descriptor: D?) {
+    init(id: ID = .default(), _ value: Value<T>, descriptor: D? = nil) {
         self.init(id: id, value: value, descriptor: descriptor)
     }
 }
 
 public extension Group {
 
-    init(id: ID = .default(), outcome: GroupOutcome<T, D>, _ descriptor: D? = nil, @Calc<T, D>.GroupBuilder items: () -> [Item<T, D>]) {
+    init(id: ID = .default(), outcome: GroupOutcome<T, D>, descriptor: D? = nil, @Calc<T, D>.GroupBuilder items: () -> [Item<T, D>]) {
         self.init(id: id, items: items(), outcome: outcome, descriptor: descriptor)
+    }
+}
+
+public extension Value {
+
+    static func reference(_ idString: String) -> Self {
+        .reference(Ref.byID(.string(idString)))
     }
 }
 
@@ -221,9 +293,9 @@ public struct Sum<D: Descriptor> {
 }
 
 public struct GroupSum<T: CalcValue, D: Descriptor> {
-    let id: ID
-    let items: () -> [Item<T, D>]
-    let descriptor: D?
+    public let id: ID
+    public let items: () -> [Item<T, D>]
+    public let descriptor: D?
 
     public init(id: ID = .default(), descriptor: D? = nil, @Calc<T, D>.GroupBuilder items: @escaping () -> [Item<T, D>]) {
         self.id = id

@@ -52,22 +52,67 @@ public extension Calc {
                     return .immutable(plainValue)
                 case let .reference(id):
                     guard
-                        let lineResult = calcResult.groupResult.firstLineResultInRange(range: .all)
+                        let lineResult = calcResult.groupResult.firstLineResultInRange(range: .single(id))
                     else {
-                        return .error(.referenceNotFound(line: line.id, missingRef: id))
+                        return .error(.referenceNotFound(source: line.id, missingRef: id))
                     }
                     return lineResult.valueResult
+                case let .transformedReference(op):
+                    guard
+                        let lineResult = calcResult.groupResult.firstLineResultInRange(range: .single(op.ref))
+                    else {
+                        return .error(.referenceNotFound(source: line.id, missingRef: op.ref))
+                    }
+                    switch lineResult.valueResult {
+                    case let .calculated(value):
+                        return .calculated(op.op(value))
+                    case let .immutable(value):
+                        return .calculated(op.op(value))
+                    case .pending:
+                        return .calculated(op.op(0))
+                    case .error:
+                        return lineResult.valueResult
+                    }
                 case let .binaryOp(op):
                     guard let a = calcResult.groupResult.firstLineResultInRange(range: .single(op.a)) else {
-                        return .error(.referenceNotFound(line: line.id, missingRef: op.a))
+                        return .error(.referenceNotFound(source: line.id, missingRef: op.a))
                     }
                     guard let b = calcResult.groupResult.firstLineResultInRange(range: .single(op.b)) else {
-                        return .error(.referenceNotFound(line: line.id, missingRef: op.b))
+                        return .error(.referenceNotFound(source: line.id, missingRef: op.b))
+                    }
+                    if case let .error(error) = a.valueResult {
+                        return .error(error)
+                    }
+                    if case let .error(error) = b.valueResult {
+                        return .error(error)
                     }
                     guard let aValue = a.valueResult.value, let bValue = b.valueResult.value else {
                         return .pending
                     }
                     return .calculated(op.op(aValue, bValue))
+                case let .ternaryOp(op):
+                    guard let a = calcResult.groupResult.firstLineResultInRange(range: .single(op.a)) else {
+                        return .error(.referenceNotFound(source: line.id, missingRef: op.a))
+                    }
+                    guard let b = calcResult.groupResult.firstLineResultInRange(range: .single(op.b)) else {
+                        return .error(.referenceNotFound(source: line.id, missingRef: op.b))
+                    }
+                    guard let c = calcResult.groupResult.firstLineResultInRange(range: .single(op.c)) else {
+                        return .error(.referenceNotFound(source: line.id, missingRef: op.c))
+                    }
+                    if case let .error(error) = a.valueResult {
+                        return .error(error)
+                    }
+                    if case let .error(error) = b.valueResult {
+                        return .error(error)
+                    }
+                    if case let .error(error) = c.valueResult {
+                        return .error(error)
+                    }
+                    guard let aValue = a.valueResult.value, let bValue = b.valueResult.value, let cValue = c.valueResult.value else {
+                        return .pending
+                    }
+                    return .calculated(op.op(aValue, bValue, cValue))
                 case let .rangeOp(rangeOp):
                     switch rangeOp.scope {
                     case let .fromTo(from, to):
@@ -112,10 +157,10 @@ public extension Calc {
 
             switch searchState.innerState {
             case .initial:
-                return .error(.rangeFromNotFound(line: line.id, rangeFromRef: fromRef))
+                return .error(.rangeFromNotFound(source: line.id, rangeFromRef: fromRef))
             case let .oneBoundFound(foundBound):
                 let unfoundBound = foundBound == fromRef ? toRef : fromRef
-                return .error(.rangeToNotFound(line: line.id, rangeToRef: unfoundBound))
+                return .error(.rangeToNotFound(source: line.id, rangeToRef: unfoundBound))
             case .finished:
                 var resolvedValues = [T]()
                 for lineResult in lineResults {

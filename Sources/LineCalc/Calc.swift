@@ -16,19 +16,23 @@ public typealias DoubleCalc = Calc<Double, String>
 extension String: Descriptor {}
 
 public protocol DefaultValueProviding {
-    static var defaultValue: Self { get  }
+    static var defaultValue: Self { get }
+    static var pendingCalculationValue: Self { get }
 }
 
 extension Double: CalcValue {
     public static var defaultValue: Double { 0 }
+    public static var pendingCalculationValue: Double { 0 }
 }
 
 extension Int: CalcValue {
     public static var defaultValue: Int { 0 }
+    public static var pendingCalculationValue: Int { 0 }
 }
 
 extension Decimal: CalcValue {
     public static var defaultValue: Decimal { 0 }
+    public static var pendingCalculationValue: Decimal { 0 }
 }
 
 public extension Calc {
@@ -41,7 +45,7 @@ public extension Calc {
         self.group = Group(
             id: groupSum.id,
             items: groupSum.items(),
-            outcome: .sum(.default(), groupSum.descriptor),
+            outcome: .sum(.default(), descriptor: groupSum.descriptor),
             descriptor: groupSum.descriptor
         )
     }

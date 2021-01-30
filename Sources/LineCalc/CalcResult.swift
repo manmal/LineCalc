@@ -3,7 +3,7 @@ import Foundation
 public extension Calc {
 
     struct CalcResult {
-        let groupResult: GroupResult
+        public let groupResult: GroupResult
     }
 
     indirect enum ItemResult {
@@ -12,14 +12,14 @@ public extension Calc {
     }
 
     struct LineResult {
-        let line: Line<T, D>
-        let valueResult: ValueResult
+        public let line: Line<T, D>
+        public let valueResult: ValueResult
     }
 
     struct GroupResult {
-        let group: Group<T, D>
-        let outcomeResult: LineResult
-        let itemResults: [ItemResult]
+        public let group: Group<T, D>
+        public let outcomeResult: LineResult
+        public let itemResults: [ItemResult]
     }
 
     enum ValueResult {
@@ -28,23 +28,25 @@ public extension Calc {
         case pending
         case error(ValueError)
 
-        var value: T? {
+        public var value: T? {
             switch self {
             case let .immutable(value):
                 return value
             case let .calculated(value):
                 return value
-            case .pending, .error:
+            case .pending:
+                return T.pendingCalculationValue
+            case .error:
                 return nil
             }
         }
     }
 
     indirect enum ValueError: Error {
-        case referenceNotFound(line: ID, missingRef: Ref)
-        case rangeFromNotFound(line: ID, rangeFromRef: Ref)
-        case rangeToNotFound(line: ID, rangeToRef: Ref)
-        case rangeGroupNotFound(line: ID, rangeGroupRef: Ref)
+        case referenceNotFound(source: ID, missingRef: Ref)
+        case rangeFromNotFound(source: ID, rangeFromRef: Ref)
+        case rangeToNotFound(source: ID, rangeToRef: Ref)
+        case rangeGroupNotFound(source: ID, rangeGroupRef: Ref)
         case errorInRef(ref: Ref, ValueError)
     }
 }
@@ -59,6 +61,15 @@ extension Calc.ItemResult {
             self = .line(Calc.LineResult(skeletonWithLine: line))
         }
     }
+
+    subscript(index: Int) -> Calc.ItemResult? {
+        switch self {
+        case let .group(groupResult):
+            return groupResult[index]
+        case .line:
+            return nil
+        }
+    }
 }
 
 extension Calc.GroupResult {
@@ -71,6 +82,11 @@ extension Calc.GroupResult {
             itemResults: itemResults
         )
     }
+
+    subscript(index: Int) -> Calc.ItemResult? {
+        guard index < itemResults.count else { return nil }
+        return itemResults[index]
+    }
 }
 
 extension Calc.LineResult {
@@ -80,7 +96,7 @@ extension Calc.LineResult {
             switch line.value {
             case let .plain(value):
                 return .immutable(value)
-            case .reference, .binaryOp, .rangeOp:
+            case .reference, .binaryOp, .ternaryOp, .rangeOp, .transformedReference:
                 return .pending
             }
         }()
@@ -93,6 +109,7 @@ extension Calc.LineResult {
             self.init(skeletonWithLine: line)
         case let .sum(id, descriptor):
             guard let first = groupItemResults.first, let last = groupItemResults.last else {
+                // TODO return better default value
                 self.init(skeletonWithLine: .init(id: id, value: .plain(0), descriptor: descriptor))
                 return
             }
@@ -108,6 +125,7 @@ extension Calc.LineResult {
             )
         case let .product(id, descriptor):
             guard let first = groupItemResults.first, let last = groupItemResults.last else {
+                // TODO return better default value
                 self.init(skeletonWithLine: .init(id: id, value: .plain(0), descriptor: descriptor))
                 return
             }
@@ -121,12 +139,28 @@ extension Calc.LineResult {
                     descriptor: descriptor
                 )
             )
+        case let .op(id, descriptor, groupOp):
+            guard let first = groupItemResults.first, let last = groupItemResults.last else {
+                // TODO return better default value
+                self.init(skeletonWithLine: .init(id: id, value: .plain(0), descriptor: descriptor))
+                return
+            }
+
+            self.init(
+                skeletonWithLine: Line<T, D>(
+                    id: id,
+                    value: .rangeOp(
+                        RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: groupOp.reduce)
+                    ),
+                    descriptor: descriptor
+                )
+            )
         }
         let valueResult: Calc.ValueResult = {
             switch line.value {
             case let .plain(value):
                 return .immutable(value)
-            case .reference, .binaryOp, .rangeOp:
+            case .reference, .binaryOp, .rangeOp, .ternaryOp, .transformedReference:
                 return .pending
             }
         }()
@@ -241,7 +275,23 @@ public extension Calc.GroupResult {
     }
 
     func firstLineResultInRange(range: Calc.ResultRange) -> Calc.LineResult? {
-        lineResultsInRange(range: range).first(where: { _ in true })
+        switch range {
+        case let .bounded(boundA, boundB, traversion, state):
+            switch boundA {
+            case let .byID(id):
+                switch id {
+                case let .default(opaqueId):
+                    break
+                default:
+                    break
+                }
+            default:
+                break
+            }
+        default:
+            break
+        }
+        return lineResultsInRange(range: range).first(where: { _ in true })
     }
 
     func lineResult(at ref: Ref) -> Calc.LineResult? {
