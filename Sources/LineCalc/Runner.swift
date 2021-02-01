@@ -5,7 +5,7 @@ public extension Calc {
     enum Runner {
         public static func run(_ calc: Calc) -> CalcResult {
             var result = runIteration(calc: calc, result: nil)
-            (0..<calc.maxIterations).forEach { iteration in
+            (0..<Item.maxIterations).forEach { iteration in
                 result = runIteration(calc: calc, result: result)
             }
             return result
@@ -44,7 +44,7 @@ public extension Calc {
             )
         }
 
-        public static func calcValueResult(_ valueResult: ValueResult, line: Item<D>.Line, calcResult: CalcResult)
+        public static func calcValueResult(_ valueResult: ValueResult, line: Item.Line, calcResult: CalcResult)
         -> ValueResult {
             switch valueResult {
             case .calculated, .pending, .error(.errorInRef):
@@ -146,10 +146,10 @@ public extension Calc {
             toRef: Ref,
             reduce: ([Double]) -> Double,
             traversion: RangeTraversion,
-            forLine line: Item<D>.Line,
+            forLine line: Item.Line,
             calcResult: CalcResult
         ) -> ValueResult {
-            let searchState = Calc.RangeSearchState()
+            let searchState = Item.RangeSearchState()
             let lineResults = Array(
                 calcResult.groupResult.lineResultsInRange(
                     range: .bounded(boundA: fromRef, boundB: toRef, traversion: traversion, state: searchState)

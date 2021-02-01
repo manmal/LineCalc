@@ -1,8 +1,6 @@
 import Foundation
 
-public struct Printer<D: Descriptor> {
-    public typealias T = Double
-
+public struct Printer {
     let lineLength: Int
     let maxDepth: Int
 
@@ -11,11 +9,11 @@ public struct Printer<D: Descriptor> {
         self.maxDepth = maxDepth
     }
 
-    public func print(_ calcResult: Calc<D>.CalcResult) -> [String] {
+    public func print<Key: KeyDescriptionProviding>(_ calcResult: Item.CalcResult) -> [String] {
         print(calcResult.groupResult, level: 0)
     }
 
-    public func print(_ groupResult: Calc<D>.GroupResult, level: Int) -> [String] {
+    public func print(_ groupResult: Item.GroupResult, level: Int) -> [String] {
         if level < maxDepth {
             let contents = groupResult.itemResults.enumerated().flatMap { print($1, level: level + 1, indexInGroup: $0) }
             let header = GroupSeparator
@@ -33,7 +31,7 @@ public struct Printer<D: Descriptor> {
         }
     }
 
-    public func print(_ itemResult: Calc<D>.ItemResult, level: Int, indexInGroup: Int) -> [String] {
+    public func print(_ itemResult: Item.ItemResult, level: Int, indexInGroup: Int) -> [String] {
         switch itemResult {
         case let .line(lineResult):
             return [print(lineResult, level: level, indexInGroup: indexInGroup)]
@@ -42,7 +40,7 @@ public struct Printer<D: Descriptor> {
         }
     }
 
-    public func print<D>(_ lineResult: Calc<D>.LineResult, level: Int, indexInGroup: Int) -> String {
+    public func print(_ lineResult: Item.LineResult, level: Int, indexInGroup: Int) -> String {
         let nf = NumberFormatter()
         nf.numberStyle = .decimal
         nf.groupingSeparator = "."
@@ -93,14 +91,14 @@ private extension Printer {
         return nf
     }
 
-    private static func currencyString<D: Descriptor>(_ valueResult: Calc<D>.ValueResult) -> String {
+    private static func currencyString(_ valueResult: Item.ValueResult) -> String {
         (valueResult.value).map { currencyFormatter.string(from: NSNumber(value: $0)) ?? "-" } ?? "undefined"
     }
 
     enum GroupSeparator {
         case header(descriptor: D?)
         case bottomSeparator
-        case outcome(valueResult: Calc<D>.ValueResult, descriptor: D?)
+        case outcome(valueResult: Item.ValueResult)
         case emptyLineAboveOrBelowGroup
 
         func print(level: Int, lineLength: Int) -> String {
@@ -160,4 +158,8 @@ private extension Printer {
                 + rightMost
         }
     }
+}
+
+public protocol KeyDescriptionProviding {
+    func description(indexInParent: Int, value: Double) -> String
 }

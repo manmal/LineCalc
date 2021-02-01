@@ -1,46 +1,40 @@
 import Foundation
 
-public extension Calc {
+public extension Item {
 
     @_functionBuilder
     struct GroupBuilder {
-        public static func buildBlock(_ components: Item<D>...) -> [Item<D>] {
+        public static func buildBlock(_ components: Item...) -> [Item] {
             components
         }
 
-        public static func buildExpression(_ line: Item<D>.Line) -> Item<D> {
+        public static func buildExpression(_ line: Item.Line) -> Item {
             .line(line)
         }
 
-        public static func buildExpression(_ group: Item<D>.Group) -> Item<D> {
+        public static func buildExpression(_ group: Item.Group) -> Item {
             .group(group)
         }
 
-        public static func buildExpression(_ item: Item<D>) -> Item<D> {
+        public static func buildExpression(_ item: Item) -> Item {
             item
         }
 
-        public static func buildExpression(_ value: Double) -> Item<D> {
-            .line(.init(value, descriptor: nil))
+        public static func buildExpression(_ value: Double) -> Item {
+            .line(.init(value))
         }
 
-        public static func buildExpression(_ tuple: (Double, idString: String, descriptor: D?)) -> Item<D> {
-            .value(tuple.0, id: tuple.1, descriptor: tuple.2)
+        public static func buildExpression(_ sum: Sum) -> Item {
+            .sum(from: sum.from, to: sum.to, key: sum.key)
         }
 
-        public static func buildExpression(_ sum: Sum<D>) -> Item<D> {
-            .sum(from: sum.from, to: sum.to, id: sum.id, descriptor: sum.descriptor)
-        }
-
-        public static func buildExpression(_ groupSum: GroupSum<D>) -> Item<D> {
+        public static func buildExpression(_ groupSum: GroupSum) -> Item {
             .group(
-                Item<D>.Group(
-                    id: groupSum.id,
+                Item.Group(
+                    key: groupSum.key,
                     outcome: .sum(
-                        .default(),
-                        descriptor: groupSum.descriptor
+                        .default()
                     ),
-                    descriptor: groupSum.descriptor,
                     items: groupSum.items
                 )
             )

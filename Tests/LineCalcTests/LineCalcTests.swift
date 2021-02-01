@@ -23,7 +23,7 @@ final class LineCalcTests: XCTestCase {
                 }
             }
         )
-        let result = DoubleCalc.Runner.run(calc).groupResult
+        let result = Item.Runner.run(calc).groupResult
         XCTAssertEqual(result.value(atLine: "sumShouldBeEight"), 8)
         XCTAssertEqual(result.value(atLine: "sumShouldBeFive"), 5)
         XCTAssertEqual(result.value(atLine: "sumShouldBeFifteenA"), 15)
@@ -49,7 +49,7 @@ final class LineCalcTests: XCTestCase {
                 (7, "seven", nil)
             }
         )
-        let result = DoubleCalc.Runner.run(calc).groupResult
+        let result = Item.Runner.run(calc).groupResult
 
         // Deep traversal means that every group's items are added,
         // in addition to the Group's outcome. Hence, the result is:
@@ -76,7 +76,7 @@ final class LineCalcTests: XCTestCase {
                 }
             }
         )
-        let result = DoubleCalc.Runner.run(calc).groupResult
+        let result = Item.Runner.run(calc).groupResult
 
         // Deep traversal means that every group's items are added,
         // in addition to the Group's outcome. Hence, the result is:
@@ -103,7 +103,7 @@ final class LineCalcTests: XCTestCase {
                 }
             }
         )
-        let result = DoubleCalc.Runner.run(calc).groupResult
+        let result = Item.Runner.run(calc).groupResult
         XCTAssertEqual(result.outcomeResult.valueResult.value, 15)
     }
 

@@ -25,6 +25,6 @@ final class PrinterTests: XCTestCase {
                 }
             }
         )
-        print(Printer().print(DoubleCalc.Runner.run(calc)).joined(separator: "\n"))
+        print(Printer().print(Item.Runner.run(calc)).joined(separator: "\n"))
     }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-public extension Calc {
+public extension Item where LocalKey == Key<GlobalKey> {
 
     struct CalcResult {
         public let groupResult: GroupResult
@@ -12,12 +12,12 @@ public extension Calc {
     }
 
     struct LineResult {
-        public let line: Item<D>.Line
+        public let line: Item.Line
         public let valueResult: ValueResult
     }
 
     struct GroupResult {
-        public let group: Item<D>.Group
+        public let group: Item.Group
         public let outcomeResult: LineResult
         public let itemResults: [ItemResult]
     }
@@ -43,26 +43,26 @@ public extension Calc {
     }
 
     indirect enum ValueError: Error {
-        case referenceNotFound(source: ID, missingRef: Ref)
-        case rangeFromNotFound(source: ID, rangeFromRef: Ref)
-        case rangeToNotFound(source: ID, rangeToRef: Ref)
-        case rangeGroupNotFound(source: ID, rangeGroupRef: Ref)
+        case referenceNotFound(source: Key, missingRef: Ref)
+        case rangeFromNotFound(source: Key, rangeFromRef: Ref)
+        case rangeToNotFound(source: Key, rangeToRef: Ref)
+        case rangeGroupNotFound(source: Key, rangeGroupRef: Ref)
         case errorInRef(ref: Ref, ValueError)
     }
 }
 
-extension Calc.ItemResult {
+extension Item.ItemResult {
 
-    init(skeletonWithItem item: Item<D>) {
+    init(skeletonWithItem item: Item) {
         switch item {
         case let .group(group):
-            self = .group(Calc.GroupResult(skeletonWithGroup: group))
+            self = .group(Item.GroupResult(skeletonWithGroup: group))
         case let .line(line):
-            self = .line(Calc.LineResult(skeletonWithLine: line))
+            self = .line(Item.LineResult(skeletonWithLine: line))
         }
     }
 
-    subscript(index: Int) -> Calc.ItemResult? {
+    subscript(index: Int) -> Item.ItemResult? {
         switch self {
         case let .group(groupResult):
             return groupResult[index]
@@ -72,27 +72,27 @@ extension Calc.ItemResult {
     }
 }
 
-extension Calc.GroupResult {
+extension Item.GroupResult {
 
-    init(skeletonWithGroup group: Item<D>.Group) {
-        let itemResults = group.items.map(Calc.ItemResult.init(skeletonWithItem:))
+    init(skeletonWithGroup group: Item.Group) {
+        let itemResults = group.items.map(Item.ItemResult.init(skeletonWithItem:))
         self = .init(
             group: group,
-            outcomeResult: Calc.LineResult(skeletonWithGroupOutcome: group.outcome, groupItemResults: itemResults),
+            outcomeResult: Item.LineResult(skeletonWithGroupOutcome: group.outcome, groupItemResults: itemResults),
             itemResults: itemResults
         )
     }
 
-    subscript(index: Int) -> Calc.ItemResult? {
+    subscript(index: Int) -> Item.ItemResult? {
         guard index < itemResults.count else { return nil }
         return itemResults[index]
     }
 }
 
-extension Calc.LineResult {
+extension Item.LineResult {
 
-    init(skeletonWithLine line: Item<D>.Line) {
-        let valueResult: Calc.ValueResult = {
+    init(skeletonWithLine line: Item.Line) {
+        let valueResult: Item.ValueResult = {
             switch line.value {
             case let .plain(value):
                 return .immutable(value)
@@ -100,63 +100,60 @@ extension Calc.LineResult {
                 return .pending
             }
         }()
-        self = Calc.LineResult(line: line, valueResult: valueResult)
+        self = Item.LineResult(line: line, valueResult: valueResult)
     }
 
-    init(skeletonWithGroupOutcome outcome: Item<D>.GroupOutcome, groupItemResults: [Calc.ItemResult]) {
+    init(skeletonWithGroupOutcome outcome: Item.GroupOutcome, groupItemResults: [Item.ItemResult]) {
         switch outcome {
         case let .line(line):
             self.init(skeletonWithLine: line)
-        case let .sum(id, descriptor):
+        case let .sum(key):
             guard let first = groupItemResults.first, let last = groupItemResults.last else {
                 // TODO return better default value
-                self.init(skeletonWithLine: .init(id: id, value: .plain(0), descriptor: descriptor))
+                self.init(skeletonWithLine: .init(key: key, value: .plain(0)))
                 return
             }
 
             self.init(
-                skeletonWithLine: Item<D>.Line(
-                    id: id,
+                skeletonWithLine: Item.Line(
+                    key: key,
                     value: .rangeOp(
-                        RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: { $0.reduce(0, +) })
-                    ),
-                    descriptor: descriptor
+                        Item.RangeOp(from: first.localRef, to: last.localRef, traversion: .shallow, reduce: { $0.reduce(0, +) })
+                    )
                 )
             )
-        case let .product(id, descriptor):
+        case let .product(key):
             guard let first = groupItemResults.first, let last = groupItemResults.last else {
                 // TODO return better default value
-                self.init(skeletonWithLine: .init(id: id, value: .plain(0), descriptor: descriptor))
+                self.init(skeletonWithLine: .init(key: key, value: .plain(0)))
                 return
             }
 
             self.init(
-                skeletonWithLine: Item<D>.Line(
-                    id: id,
+                skeletonWithLine: Item.Line(
+                    key: key,
                     value: .rangeOp(
-                        RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: { $0.reduce(0, *) })
-                    ),
-                    descriptor: descriptor
+                        Item.RangeOp(from: first.localRef, to: last.localRef, traversion: .shallow, reduce: { $0.reduce(0, *) })
+                    )
                 )
             )
-        case let .op(id, descriptor, groupOp):
+        case let .op(key, groupOp):
             guard let first = groupItemResults.first, let last = groupItemResults.last else {
                 // TODO return better default value
-                self.init(skeletonWithLine: .init(id: id, value: .plain(0), descriptor: descriptor))
+                self.init(skeletonWithLine: .init(key: key, value: .plain(0)))
                 return
             }
 
             self.init(
-                skeletonWithLine: Item<D>.Line(
-                    id: id,
+                skeletonWithLine: Item.Line(
+                    key: key,
                     value: .rangeOp(
-                        RangeOp(from: first.ref, to: last.ref, traversion: .shallow, reduce: groupOp.reduce)
-                    ),
-                    descriptor: descriptor
+                        Item.RangeOp(from: first.localRef, to: last.localRef, traversion: .shallow, reduce: groupOp.reduce)
+                    )
                 )
             )
         }
-        let valueResult: Calc.ValueResult = {
+        let valueResult: Item.ValueResult = {
             switch line.value {
             case let .plain(value):
                 return .immutable(value)
@@ -164,29 +161,22 @@ extension Calc.LineResult {
                 return .pending
             }
         }()
-        self = Calc.LineResult(line: line, valueResult: valueResult)
+        self = Item.LineResult(line: line, valueResult: valueResult)
     }
 }
 
-extension Calc.CalcResult {
+public extension Item.ItemResult {
 
-    init(skeletonWithCalc calc: Calc) {
-        groupResult = Calc.GroupResult(skeletonWithGroup: calc.group)
-    }
-}
-
-public extension Calc.ItemResult {
-
-    var ref: Ref {
+    var localRef: Item.Ref {
         switch self {
         case let .group(groupResult):
-            return .byID(groupResult.group.id)
+            return .local(groupResult.group.key)
         case let .line(lineResult):
-            return .byID(lineResult.line.id)
+            return .local(lineResult.line.key)
         }
     }
 
-    var allLineResults: AnySequence<Calc.LineResult> {
+    var allLineResults: AnySequence<Item.LineResult> {
 
         switch self {
         case let .line(lineResult):
@@ -197,9 +187,9 @@ public extension Calc.ItemResult {
     }
 
     func lineResultsInRange(
-        range: Calc.ResultRange,
-        parentGroupResult: Calc.GroupResult
-    ) -> AnySequence<Calc.LineResult> {
+        range: Item.ResultRange,
+        parentGroupResult: Item.GroupResult
+    ) -> AnySequence<Item.LineResult> {
 
         switch self {
         case let .line(lineResult):
@@ -215,13 +205,13 @@ public extension Calc.ItemResult {
 }
 
 /// Lazy collection
-public extension Calc.GroupResult {
+public extension Item.GroupResult {
 
-    var allLineResults: AnySequence<Calc.LineResult> {
-        AnySequence<Calc.LineResult>(
-            (itemResults + [Calc.ItemResult.line(outcomeResult)])
+    var allLineResults: AnySequence<Item.LineResult> {
+        AnySequence<Item.LineResult>(
+            (itemResults + [Item.ItemResult.line(outcomeResult)])
             .lazy
-            .flatMap { itemResult -> AnySequence<Calc.LineResult> in
+            .flatMap { itemResult -> AnySequence<Item.LineResult> in
                 switch itemResult {
                 case let .group(groupResult):
                     return groupResult.allLineResults
@@ -233,13 +223,13 @@ public extension Calc.GroupResult {
     }
 
     func lineResultsInRange(
-        range: Calc.ResultRange
-    ) -> AnySequence<Calc.LineResult> {
+        range: Item.ResultRange
+    ) -> AnySequence<Item.LineResult> {
 
-        AnySequence<Calc.LineResult>(
-            (itemResults + [Calc.ItemResult.line(outcomeResult)])
+        AnySequence<Item.LineResult>(
+            (itemResults + [Item.ItemResult.line(outcomeResult)])
             .lazy
-            .flatMap { itemResult -> AnySequence<Calc.LineResult> in
+            .flatMap { itemResult -> AnySequence<Item.LineResult> in
                 switch range {
                 case let .bounded(_, _, _, state) where state.finished:
                     return .init([])
@@ -274,31 +264,15 @@ public extension Calc.GroupResult {
         )
     }
 
-    func firstLineResultInRange(range: Calc.ResultRange) -> Calc.LineResult? {
-        switch range {
-        case let .bounded(boundA, boundB, traversion, state):
-            switch boundA {
-            case let .byID(id):
-                switch id {
-                case let .default(opaqueId):
-                    break
-                default:
-                    break
-                }
-            default:
-                break
-            }
-        default:
-            break
-        }
+    func firstLineResultInRange(range: Item.ResultRange) -> Item.LineResult? {
         return lineResultsInRange(range: range).first(where: { _ in true })
     }
 
-    func lineResult(at ref: Ref) -> Calc.LineResult? {
+    func lineResult(at ref: Item.Ref) -> Item.LineResult? {
         firstLineResultInRange(range: .single(ref))
     }
 
-    func value(at ref: Ref) -> Double? {
+    func value(at ref: Item.Ref) -> Double? {
         lineResult(at: ref)?.valueResult.value
     }
 
@@ -308,10 +282,10 @@ public extension Calc.GroupResult {
 
 }
 
-public extension Calc {
+public extension Item {
     enum ResultRange {
         case all
-        case bounded(boundA: Ref, boundB: Ref, traversion: RangeTraversion, state: Calc.RangeSearchState = .init())
+        case bounded(boundA: Ref, boundB: Ref, traversion: RangeTraversion, state: Item.RangeSearchState = .init())
 
         public var isSingle: Bool {
             switch self {
@@ -352,13 +326,20 @@ public extension Calc {
     }
 }
 
-public extension Calc.LineResult {
+public extension Item.LineResult {
     func lineResultIfInRange(
-        range: Calc.ResultRange,
-        parentGroupResult: Calc.GroupResult
-    ) -> Calc<D>.LineResult? {
+        range: Item.ResultRange,
+        parentGroupResult: Item.GroupResult
+    ) -> Item.LineResult? {
 
-        func isRefDenotingLineResult(ref: Ref) -> Bool {
+        func isRefDenotingLineResult(ref: Item.Ref) -> Bool {
+            switch ref {
+            case let .local(localKey):
+                return line.key == localKey
+            case let .global(globalKey):
+                return line.key == globalKey
+            }
+
             switch ref {
             case let .byID(id):
                 if id == line.id {
