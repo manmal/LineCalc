@@ -1,8 +1,7 @@
 import Foundation
 
-public indirect enum Item<LocalKey: ItemKey, GlobalKey: ItemKey>: Equatable {
-    typealias LocalKey = LocalKey
-    typealias GlobalKey = GlobalKey
+public indirect enum Item<Key: Equatable>: Equatable {
+    typealias Key = Key
 
     case line(Line)
     case group(Group)
@@ -16,8 +15,6 @@ public indirect enum Item<LocalKey: ItemKey, GlobalKey: ItemKey>: Equatable {
         }
     }
 }
-
-public protocol ItemKey: Equatable {}
 
 public extension Item {
     struct Line: Equatable {
@@ -279,4 +276,42 @@ public extension Item {
     enum CalcError: Error {
         case emptyGroup(Key)
     }
+}
+
+public func ==<GlobalKey>(
+    ref: Item<GlobalKey, GlobalKey>.Ref,
+    key: Item<GlobalKey, GlobalKey>.Key
+) -> Bool {
+    switch ref {
+    case let .global(candidateKey):
+        return candidateKey == key
+    case let .local(candidateKey):
+        return candidateKey == key
+    }
+}
+
+public func ==<GlobalKey>(
+    key: Item<GlobalKey, GlobalKey>.Key,
+    ref: Item<GlobalKey, GlobalKey>.Ref
+) -> Bool {
+    ref == key
+}
+
+public func ==<LocalKey, GlobalKey>(
+    ref: Item<LocalKey, GlobalKey>.Ref,
+    key: Item<LocalKey, GlobalKey>.Key
+) -> Bool {
+    switch ref {
+    case .global(<#T##Item<ItemKey, ItemKey>.Key#>):
+        return false
+    case let .local(candidateKey):
+        return candidateKey == key
+    }
+}
+
+public func ==<LocalKey, GlobalKey>(
+    key: Item<LocalKey, GlobalKey>.Key,
+    ref: Item<LocalKey, GlobalKey>.Ref
+) -> Bool {
+    ref == key
 }

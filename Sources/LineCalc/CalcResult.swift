@@ -1,6 +1,6 @@
 import Foundation
 
-public extension Item where LocalKey == Key<GlobalKey> {
+public extension Item {
 
     struct CalcResult {
         public let groupResult: GroupResult
@@ -188,11 +188,23 @@ public extension Item.ItemResult {
 
     func lineResultsInRange(
         range: Item.ResultRange,
-        parentGroupResult: Item.GroupResult
+        parentGroupResult: Item.GroupResult?
     ) -> AnySequence<Item.LineResult> {
 
         switch self {
         case let .line(lineResult):
+            guard let parentGroupResult = parentGroupResult else {
+                switch range {
+                case .all:
+                    return .init([lineResult])
+                case let .bounded(boundA, boundB, _, _):
+                    if boundA == lineResult.line.key || boundB == lineResult.line.key {
+                        return .init([lineResult])
+                    } else {
+                        return .init([])
+                    }
+                }
+            }
             if let lineResult = lineResult.lineResultIfInRange(range: range, parentGroupResult: parentGroupResult) {
                     return .init([lineResult])
                 } else {
